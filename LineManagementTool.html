@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gleeds – Infrastructure Cost Management Line Management</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <!-- SheetJS for XLSX/XLS support -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #05060a;
+      --bg-card: #101116;
+      --bg-card-soft: #171821;
+      --border-soft: #262a35;
+      --text-main: #f7f7f9;
+      --text-soft: #a5aab5;
+      --accent-yellow: #ffd400;
+      --badge-soft: #171923;
+
+      --green-soft: rgba(46, 204, 113, 0.08);
+      --green-border: rgba(46, 204, 113, 0.4);
+      --green-text: #55d68a;
+
+      --yellow-soft: rgba(241, 196, 15, 0.12);
+      --yellow-border: rgba(241, 196, 15, 0.4);
+      --yellow-text: #f5d06a;
+
+      --red-soft: rgba(231, 76, 60, 0.12);
+      --red-border: rgba(231, 76, 60, 0.5);
+      --red-text: #ff9b8f;
+
+      --radius-card: 18px;
+      --radius-pill: 999px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #05060a;
+      color: var(--text-main);
+    }
+
+    .page {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 12px 20px 24px;
+    }
+
+    /* Header / branding --------------------------------------------------- */
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-logo {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: lowercase;
+    }
+    .brand-logo::after {
+      content: "G";
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      margin-left: 4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-yellow);
+      color: #000;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-top {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: #151823;
+      color: var(--text-main);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-top:hover {
+      background: #191c29;
+    }
+
+    /* Tabs --------------------------------------------------- */
+
+    .tabs-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .tab-btn {
+      padding: 8px 18px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-soft);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #181b27;
+      border-color: var(--border-soft);
+      color: var(--text-main);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* Cards / layout --------------------------------------------------- */
+
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-card);
+      border: 1px solid var(--border-soft);
+      padding: 14px 16px 16px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    .card + .card { margin-top: 10px; }
+
+    .pill-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: var(--radius-pill);
+      background: #171923;
+      border: 1px solid var(--border-soft);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+      margin-bottom: 6px;
+    }
+
+    .subtle {
+      font-size: 13px;
+      color: var(--text-soft);
+    }
+
+    .summary-line {
+      font-size: 20px;
+      margin: 4px 0 4px;
+    }
+    .summary-line .label { opacity: 0.75; }
+    .summary-line .value { color: #fff; font-weight: 700; padding: 0 4px; }
+    .summary-line .dot { opacity: 0.5; padding: 0 6px; }
+
+    .summary-badges {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .summary-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-soft);
+      background: #171923;
+      font-size: 11px;
+    }
+    .summary-badge span { opacity: 0.8; }
+    .summary-badge strong { color: #fff; }
+
+    .shell-overview {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 16px;
+      align-items: flex-start;
+    }
+    @media (max-width: 1100px) {
+      .shell-overview {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .stack { display: flex; flex-direction: column; gap: 10px; }
+
+    .field { margin-bottom: 10px; }
+    .field-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+      margin-bottom: 4px;
+    }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border-soft);
+      background: #151823;
+      color: var(--text-main);
+      font-size: 13px;
+    }
+
+    input[type="file"] {
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: #ffd400;
+      color: #000;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-main);
+    }
+
+    /* People table --------------------------------------------------- */
+
+    .people-table-wrap {
+      overflow: auto;
+      max-height: 430px;
+      border-radius: 12px;
+      border: 1px solid var(--border-soft);
+      background: var(--bg-card-soft);
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 12px;
+    }
+    thead {
+      position: sticky;
+      top: 0;
+      background: #181b23;
+      z-index: 5;
+    }
+    th, td {
+      padding: 5px 8px;
+      border-bottom: 1px solid #1f2230;
+      white-space: nowrap;
+    }
+    th {
+      font-weight: 500;
+      color: var(--text-soft);
+      text-align: left;
+    }
+    tbody tr:hover { background: #171b27; }
+
+    /* Capacity chips --------------------------------------------------- */
+
+    .cap-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      border: 1px solid var(--border-soft);
+      background: var(--badge-soft);
+    }
+    .cap-chip span { opacity: 0.85; }
+    .cap-chip strong { font-weight: 600; }
+
+    .cap-under {
+      background: var(--green-soft);
+      border-color: var(--green-border);
+      color: var(--green-text);
+    }
+    .cap-full {
+      background: var(--yellow-soft);
+      border-color: var(--yellow-border);
+      color: var(--yellow-text);
+    }
+    .cap-over {
+      background: var(--red-soft);
+      border-color: var(--red-border);
+      color: var(--red-text);
+    }
+
+    /* Find a manager --------------------------------------------------- */
+
+    .filters-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    @media (max-width: 700px) {
+      .filters-row { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    .results-list {
+      max-height: 260px;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border-soft);
+      background: var(--bg-card-soft);
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+    .manager-row {
+      padding: 6px 4px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .manager-row + .manager-row {
+      border-top: 1px solid #1f2230;
+    }
+    .manager-main { display: flex; flex-direction: column; gap: 2px; }
+    .manager-main strong { font-size: 13px; }
+    .manager-meta {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    /* Organigram --------------------------------------------------- */
+
+    .org-controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .org-tree-wrap {
+      max-height: 520px;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border-soft);
+      background: var(--bg-card-soft);
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .org-group-title {
+      font-size: 12px;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 8px 0 4px;
+    }
+
+    .org-tree ul {
+      list-style: none;
+      margin: 0;
+      padding-left: 14px;
+      border-left: 1px dashed #2b3140;
+    }
+    .org-tree li {
+      margin: 3px 0;
+      padding-left: 6px;
+      position: relative;
+    }
+
+    .org-person {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #141824;
+      border: 1px solid #262a35;
+    }
+    .org-person-name { font-size: 12px; }
+    .org-person-role {
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">gleeds</div>
+      <div class="brand-title">Infrastructure Cost Management Line Management</div>
+    </div>
+    <div class="top-actions">
+      <button class="btn-top" id="btnLoad">Load CSV/XLSX…</button>
+      <button class="btn-top" id="btnExport">Export CSV</button>
+      <button class="btn-top" id="btnClear">Clear stored data</button>
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display:none;">
+    </div>
+  </header>
+
+  <div class="tabs-row">
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="organigram">Organigram</button>
+  </div>
+
+  <!-- OVERVIEW TAB -------------------------------------------------- -->
+  <section id="tab-overview" class="tab-panel active">
+    <div class="shell-overview">
+      <div class="stack">
+        <div class="card">
+          <div class="pill-label">Summary</div>
+          <div class="summary-line" id="summaryLine">
+            <span class="label">People:</span> <span class="value">0</span>
+            <span class="dot">•</span>
+            <span class="label">Managers:</span> <span class="value">0</span>
+            <span class="dot">•</span>
+            <span class="label">Top-level:</span> <span class="value">0</span>
+          </div>
+          <div class="summary-badges" id="summaryBadges">
+            <div class="summary-badge"><span>Under capacity</span> <strong>0</strong></div>
+            <div class="summary-badge"><span>At capacity</span> <strong>0</strong></div>
+            <div class="summary-badge"><span>Over capacity</span> <strong>0</strong></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div class="pill-label">People</div>
+            <div class="field" style="margin:0;width:200px;">
+              <div class="field-label">Quick search</div>
+              <input type="text" id="peopleSearch" placeholder="Name, office, region…">
+            </div>
+          </div>
+          <div class="people-table-wrap">
+            <table id="peopleTable">
+              <thead><tr id="peopleHeadRow"></tr></thead>
+              <tbody id="peopleBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="pill-label">Find a line manager</div>
+          <div class="filters-row">
+            <div class="field">
+              <div class="field-label">Discipline</div>
+              <select id="fmDiscipline"></select>
+            </div>
+            <div class="field">
+              <div class="field-label">Region</div>
+              <select id="fmRegion"></select>
+            </div>
+            <div class="field">
+              <div class="field-label">Grade (manager)</div>
+              <select id="fmGrade"></select>
+            </div>
+            <div class="field">
+              <div class="field-label">Minimum free capacity</div>
+              <input type="number" id="fmFreeCap" min="0" value="1">
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:6px;">
+            <button class="btn" id="fmSearchBtn" disabled>Suggest</button>
+            <button class="btn btn-ghost" id="fmClearBtn" disabled style="margin-left:6px;">Clear</button>
+          </div>
+          <div class="results-list" id="fmResults">
+            <div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ORGANIGRAM TAB ------------------------------------------------ -->
+  <section id="tab-organigram" class="tab-panel">
+    <div class="card">
+      <div class="pill-label">Organigram</div>
+      <div class="org-controls">
+        <div class="field" style="flex:1;min-width:160px;margin-bottom:0;">
+          <div class="field-label">Group by</div>
+          <select id="orgGroupBy">
+            <option value="region">Region</option>
+            <option value="discipline">Discipline</option>
+            <option value="region-discipline">Region + Discipline</option>
+          </select>
+        </div>
+        <button class="btn" id="orgBuildBtn" disabled>Build organigram</button>
+      </div>
+      <div class="org-tree-wrap">
+        <div id="orgTreeRoot" class="org-tree">
+          <div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  // --- Canonical columns / aliases ---------------------------------------
+  const ALIAS = {
+    Surname: ['Surname','Last Name','LastName','Family Name'],
+    FirstForename: ['First Forename','FirstForename','First Name','FirstName','Forename'],
+    CostCentre: ['Cost Centre','CostCentre','Cost centre'],
+    Grade: ['Grade'],
+    GradeLevel: ['Grade Level','GradeLevel','Level','Band'],
+    Discipline: ['Discipline','Function','Department','Practice'],
+    Office: ['Office','Office/Location','Location','Base Office'],
+    Region: ['Region'],
+    Area: ['Area'],
+    Technical: ['Technical','Technical/Operational'],
+    DirectorName: ['Director Name','Director','Line Director'],
+    Manager: ['Manager','Line Manager','Reporting Manager','Reports To','Manager Name'],
+    Appraiser: ['Appraiser','Reviewer'],
+    ExpenseApprover: ['Expense Approver','Expenses Approver','ExpenseApprover'],
+    IsManager: ['Is Manager','IsManager','Manager?'],
+    IsDirector: ['Is Director','IsDirector','Director?'],
+    IsAppraiser: ['Is Appraiser','IsAppraiser','Appraiser?'],
+    Capacity: ['Capacity','Line Capacity','line_capacity']
+  };
+
+  const state = {
+    rawObjects: [],
+    people: [],
+    managersByName: new Map(),
+  };
+
+  // --- Utility ------------------------------------------------------------
+  function norm(s){ return (s||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,''); }
+
+  function buildKeyMap(firstRow){
+    const keys = Object.keys(firstRow || {});
+    const keysNorm = keys.map(k=>norm(k));
+    const map = {};
+    for (const [canon, aliases] of Object.entries(ALIAS)){
+      const candidates = [canon, ...aliases];
+      const normCands = candidates.map(c=>norm(c));
+      let hit = null;
+      hit = keys.find(k => candidates.includes(k));
+      if (!hit){
+        const idx = keysNorm.findIndex(k => normCands.includes(k));
+        if (idx >= 0) hit = keys[idx];
+      }
+      if (hit) map[canon] = hit;
+    }
+    return map;
+  }
+
+  function getVal(map, row, canon){
+    const actual = map[canon];
+    return actual ? (row[actual] ?? '') : '';
+  }
+
+  function toBool(v){
+    const t = (v||'').toString().trim().toLowerCase();
+    return t === 'y' || t === 'yes' || t === 'true' || t === '1';
+  }
+
+  function toNum(v){
+    const n = parseFloat((v||'').toString().replace(',','.'));
+    return isNaN(n) ? 0 : n;
+  }
+
+  // --- CSV / XLSX parsing -------------------------------------------------
+  function detectDelimiter(sample){
+    const cands = [',',';','\t','|'];
+    const counts = {',':0,';':0,'\t':0,'|':0};
+    let inq=false;
+    for (let i=0;i<sample.length;i++){
+      const ch=sample[i];
+      if(ch=='"'){
+        if(sample[i+1]=='"'){i++;continue;}
+        inq=!inq;
+      } else if(!inq && counts.hasOwnProperty(ch)){
+        counts[ch]++;
+      }
+    }
+    let best=',',bestN=-1;
+    for(const d of cands){ if(counts[d]>bestN){bestN=counts[d];best=d;} }
+    return best;
+  }
+
+  function parseCSVAuto(text){
+    if (!text) return [];
+    text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    const delim = detectDelimiter(text.slice(0,2000));
+    const rows=[]; let row=[], val='', i=0, inq=false;
+    while(i<text.length){
+      const ch=text[i];
+      if(inq){
+        if(ch=='"'){
+          if(text[i+1]=='"'){val+='"';i+=2;continue;}
+          inq=false;i++;continue;
+        }
+        val+=ch;i++;continue;
+      } else {
+        if(ch=='"'){inq=true;i++;continue;}
+        if(ch===delim){row.push(val);val='';i++;continue;}
+        if(ch=='\n'){row.push(val);rows.push(row);row=[];val='';i++;continue;}
+        val+=ch;i++;continue;
+      }
+    }
+    row.push(val); rows.push(row);
+    if(rows.length && rows[rows.length-1].every(c=>!String(c||'').trim())) rows.pop();
+    return rows;
+  }
+
+  function rowsToObjects(rows){
+    if (!rows.length) return [];
+    while(rows.length && rows[0].every(c=>!String(c||'').trim())) rows.shift();
+    if (!rows.length) return [];
+    const heads = rows[0].map(h=>(h||'').trim());
+    return rows.slice(1).map(r=>{
+      const o={};
+      heads.forEach((h,idx)=>{ o[h] = (r[idx] ?? ''); });
+      return o;
+    });
+  }
+
+  function xlsxToObjects(buf){
+    const wb = XLSX.read(buf,{type:'array'});
+    const sheetName = wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    return XLSX.utils.sheet_to_json(sheet, {defval:'', raw:false});
+  }
+
+  function handleFile(file){
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const buf = e.target.result;
+      const u8 = new Uint8Array(buf);
+      const looksZip = u8.length>=2 && u8[0]===0x50 && u8[1]===0x4b;
+      try{
+        let objs=[];
+        if (looksZip || name.endsWith('.xlsx') || name.endsWith('.xls')){
+          objs = xlsxToObjects(buf);
+        } else {
+          let text = new TextDecoder('utf-8',{fatal:false}).decode(buf);
+          let rows = parseCSVAuto(text);
+          objs = rowsToObjects(rows);
+          if (!objs.length){
+            const text2 = new TextDecoder('utf-16le',{fatal:false}).decode(buf);
+            rows = parseCSVAuto(text2);
+            objs = rowsToObjects(rows);
+          }
+        }
+        processObjects(objs);
+      }catch(err){
+        console.error(err);
+        alert('Could not read file. Please save as CSV (UTF-8) or XLSX and try again.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // --- Capacity by grade rules -------------------------------------------
+  function gradeDefaultCapacity(grade, gradeLevel){
+    const s = ((grade || '') + ' ' + (gradeLevel || '')).toLowerCase();
+    let cap = 0;
+    if (s.includes('senior director')) cap = 10;
+    else if (s.includes('project director')) cap = 8;
+    else if (s.includes('associate')) cap = 6;      // Associate Director
+    else if (s.includes('director')) cap = 10;      // plain Director
+    else if (s.includes('executive')) cap = 5;      // Executive Cost Manager
+    else if (s.includes('senior')) cap = 4;         // Senior Cost Manager
+    else if (s.includes('professional')) cap = 3;   // Professional Cost Manager
+    else if (s.includes('assistant')) cap = 2;      // Assistant Cost Manager
+    return cap;
+  }
+
+  // --- Process into canonical people -------------------------------------
+  function processObjects(objs){
+    if (!objs || !objs.length){
+      state.rawObjects = [];
+      state.people = [];
+      renderAll();
+      return;
+    }
+    const keyMap = buildKeyMap(objs[0]);
+    const people = objs.map((row, idx)=>{
+      const p = {};
+      p.id = 'p'+(idx+1);
+      p.Surname = getVal(keyMap,row,'Surname');
+      p.FirstForename = getVal(keyMap,row,'FirstForename');
+      p.CostCentre = getVal(keyMap,row,'CostCentre');
+      p.Grade = getVal(keyMap,row,'Grade');
+      p.GradeLevel = getVal(keyMap,row,'GradeLevel');
+      p.Discipline = getVal(keyMap,row,'Discipline');
+      p.Office = getVal(keyMap,row,'Office');
+      p.Region = getVal(keyMap,row,'Region');
+      p.Area = getVal(keyMap,row,'Area');
+      p.Technical = getVal(keyMap,row,'Technical');
+      p.DirectorName = getVal(keyMap,row,'DirectorName');
+      p.Manager = getVal(keyMap,row,'Manager');
+      p.Appraiser = getVal(keyMap,row,'Appraiser');
+      p.ExpenseApprover = getVal(keyMap,row,'ExpenseApprover');
+      p.IsManager = toBool(getVal(keyMap,row,'IsManager'));
+      p.IsDirector = toBool(getVal(keyMap,row,'IsDirector'));
+      p.IsAppraiser = toBool(getVal(keyMap,row,'IsAppraiser'));
+      p.Capacity = toNum(getVal(keyMap,row,'Capacity'));
+      // apply grade rules if capacity not set or zero
+      if (!p.Capacity || p.Capacity <= 0){
+        p.Capacity = gradeDefaultCapacity(p.Grade, p.GradeLevel);
+      }
+      p.FullName = (p.FirstForename + ' ' + p.Surname).trim();
+      p.fullNameKey = p.FullName.toLowerCase();
+      return p;
+    });
+
+    const byName = new Map();
+    people.forEach(p=>{ if (p.fullNameKey) byName.set(p.fullNameKey, p); });
+    people.forEach(p=>{ p.currentReports = 0; });
+    people.forEach(p=>{
+      const mgr = (p.Manager || '').toString().trim().toLowerCase();
+      if (!mgr) return;
+      const m = byName.get(mgr);
+      if (m) m.currentReports++;
+    });
+
+    people.forEach(p=>{
+      const cap = p.Capacity || 0;
+      const used = p.currentReports || 0;
+      p.freeSlots = Math.max(cap - used, 0);
+      if (cap === 0){
+        if (used>0)      p.capStatus = 'over';
+        else             p.capStatus = 'full';
+      } else if (used < cap){
+        p.capStatus = 'under';
+      } else if (used === cap){
+        p.capStatus = 'full';
+      } else {
+        p.capStatus = 'over';
+      }
+    });
+
+    state.rawObjects = objs;
+    state.people = people;
+    state.managersByName = byName;
+    renderAll();
+  }
+
+  // --- Summary -----------------------------------------------------------
+  function renderSummary(){
+    const line = document.getElementById('summaryLine');
+    const badges = document.getElementById('summaryBadges');
+    const people = state.people || [];
+    const total = people.length;
+    const managers = people.filter(p=>p.IsManager || p.currentReports>0).length;
+    const top = people.filter(p=>!p.Manager || !p.Manager.toString().trim()).length;
+    const under = people.filter(p=>p.IsManager && p.capStatus==='under').length;
+    const full = people.filter(p=>p.IsManager && p.capStatus==='full').length;
+    const over = people.filter(p=>p.IsManager && p.capStatus==='over').length;
+
+    line.innerHTML = `
+      <span class="label">People:</span> <span class="value">${total}</span>
+      <span class="dot">•</span>
+      <span class="label">Managers:</span> <span class="value">${managers}</span>
+      <span class="dot">•</span>
+      <span class="label">Top-level:</span> <span class="value">${top}</span>
+    `;
+    badges.innerHTML = `
+      <div class="summary-badge"><span>Under capacity</span> <strong>${under}</strong></div>
+      <div class="summary-badge"><span>At capacity</span> <strong>${full}</strong></div>
+      <div class="summary-badge"><span>Over capacity</span> <strong>${over}</strong></div>
+    `;
+  }
+
+  // --- People table ------------------------------------------------------
+  const peopleHeadRow = document.getElementById('peopleHeadRow');
+  const peopleBody = document.getElementById('peopleBody');
+  const peopleSearch = document.getElementById('peopleSearch');
+
+  function renderPeopleTable(){
+    const people = state.people || [];
+    const displayCols = [
+      'FullName','Grade','GradeLevel','Discipline','Office',
+      'Region','Area','DirectorName','Manager','IsManager','Capacity','currentReports'
+    ];
+    const headers = {
+      FullName:'Name',
+      Grade:'Grade',
+      GradeLevel:'Grade level',
+      Discipline:'Discipline',
+      Office:'Office',
+      Region:'Region',
+      Area:'Area',
+      DirectorName:'Director',
+      Manager:'Manager',
+      IsManager:'Is manager',
+      Capacity:'Capacity',
+      currentReports:'Reports'
+    };
+    peopleHeadRow.innerHTML = displayCols.map(c=>`<th>${headers[c]||c}</th>`).join('');
+    const query = (peopleSearch.value||'').toString().trim().toLowerCase();
+    const filtered = !query ? people : people.filter(p=>{
+      const hay = [
+        p.FullName,p.Grade,p.GradeLevel,p.Discipline,
+        p.Office,p.Region,p.Area,p.Manager,p.DirectorName
+      ].join(' ').toLowerCase();
+      return hay.includes(query);
+    });
+
+    peopleBody.innerHTML = filtered.map(p=>{
+      const capChip = (function(){
+        const text = `${p.currentReports}/${p.Capacity||0}`;
+        if (!p.IsManager) return text;
+        const cls = p.capStatus==='under' ? 'cap-chip cap-under'
+                  : p.capStatus==='full' ? 'cap-chip cap-full'
+                  : 'cap-chip cap-over';
+        const label = p.capStatus==='under' ? 'Under'
+                    : p.capStatus==='full' ? 'At'
+                    : 'Over';
+        return `<span class="${cls}"><span>${label}</span><strong>${text}</strong></span>`;
+      })();
+      return `
+        <tr>
+          <td>${p.FullName || ''}</td>
+          <td>${p.Grade || ''}</td>
+          <td>${p.GradeLevel || ''}</td>
+          <td>${p.Discipline || ''}</td>
+          <td>${p.Office || ''}</td>
+          <td>${p.Region || ''}</td>
+          <td>${p.Area || ''}</td>
+          <td>${p.DirectorName || ''}</td>
+          <td>${p.Manager || ''}</td>
+          <td>${p.IsManager ? 'Y' : ''}</td>
+          <td>${capChip}</td>
+          <td>${p.currentReports}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  peopleSearch.addEventListener('input', renderPeopleTable);
+
+  // --- Find a manager ----------------------------------------------------
+  const fmDiscipline = document.getElementById('fmDiscipline');
+  const fmRegion = document.getElementById('fmRegion');
+  const fmGrade = document.getElementById('fmGrade');
+  const fmFreeCap = document.getElementById('fmFreeCap');
+  const fmSearchBtn = document.getElementById('fmSearchBtn');
+  const fmClearBtn = document.getElementById('fmClearBtn');
+  const fmResults = document.getElementById('fmResults');
+
+  function uniq(arr){ return Array.from(new Set(arr.filter(Boolean))).sort((a,b)=>a.localeCompare(b)); }
+  function fillSelect(sel, items){
+    sel.innerHTML = '<option value="">Any</option>' + items.map(v=>`<option>${v}</option>`).join('');
+  }
+
+  function fillFilterOptions(){
+    const people = state.people || [];
+    fillSelect(fmDiscipline, uniq(people.map(p=>p.Discipline)));
+    fillSelect(fmRegion, uniq(people.map(p=>p.Region)));
+    fillSelect(fmGrade, uniq(people.map(p=>p.Grade)));
+    const hasData = people.length>0;
+    fmSearchBtn.disabled = !hasData;
+    fmClearBtn.disabled = !hasData;
+  }
+
+  function renderFindManagerResults(list){
+    if (!list.length){
+      fmResults.innerHTML = '<div class="subtle">No managers match those filters.</div>';
+      return;
+    }
+    fmResults.innerHTML = list.map(p=>{
+      const capCls = p.capStatus==='under' ? 'cap-chip cap-under'
+                  : p.capStatus==='full' ? 'cap-chip cap-full'
+                  : 'cap-chip cap-over';
+      const capText = `${p.currentReports}/${p.Capacity||0}`;
+      const capLabel = p.capStatus==='under' ? 'Under'
+                      : p.capStatus==='full' ? 'At'
+                      : 'Over';
+      return `
+        <div class="manager-row">
+          <div class="manager-main">
+            <strong>${p.FullName}</strong>
+            <div class="manager-meta">
+              <span>${p.Grade || ''}</span>
+              ${p.Discipline ? `<span>${p.Discipline}</span>` : ''}
+              ${p.Office ? `<span>${p.Office}</span>` : ''}
+              ${p.Region ? `<span>${p.Region}</span>` : ''}
+            </div>
+          </div>
+          <div class="${capCls}">
+            <span>${capLabel}</span><strong>${capText}</strong>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  fmSearchBtn.addEventListener('click', ()=>{
+    const people = state.people || [];
+    const disc = fmDiscipline.value;
+    const reg = fmRegion.value;
+    const grade = fmGrade.value;
+    const minFree = parseInt(fmFreeCap.value || '0', 10);
+    const candidates = people.filter(p=>{
+      if (!p.IsManager) return false;
+      if (disc && p.Discipline !== disc) return false;
+      if (reg && p.Region !== reg) return false;
+      if (grade && p.Grade !== grade) return false;
+      if ((p.freeSlots || 0) < minFree) return false;
+      return true;
+    }).sort((a,b)=> (b.freeSlots||0) - (a.freeSlots||0)).reverse();
+    renderFindManagerResults(candidates);
+  });
+
+  fmClearBtn.addEventListener('click', ()=>{
+    fmDiscipline.value = '';
+    fmRegion.value = '';
+    fmGrade.value = '';
+    fmFreeCap.value = 1;
+    fmResults.innerHTML = '<div class="subtle">Cleared. Set filters and click <strong>Suggest</strong>.</div>';
+  });
+
+  // --- Organigram --------------------------------------------------------
+  const orgGroupBy = document.getElementById('orgGroupBy');
+  const orgBuildBtn = document.getElementById('orgBuildBtn');
+  const orgTreeRoot = document.getElementById('orgTreeRoot');
+
+  function buildHierarchy(people){
+    const byId = new Map();
+    people.forEach(p=>{ p.children = []; byId.set(p.id, p); });
+    const nameToId = new Map();
+    people.forEach(p=>{ if (p.fullNameKey) nameToId.set(p.fullNameKey, p.id); });
+    const roots = [];
+    people.forEach(p=>{
+      const mgrName = (p.Manager||'').toString().trim().toLowerCase();
+      const mgrId = mgrName ? nameToId.get(mgrName) : null;
+      if (mgrId && byId.has(mgrId) && mgrId !== p.id){
+        byId.get(mgrId).children.push(p);
+      } else {
+        roots.push(p);
+      }
+    });
+    return roots;
+  }
+
+  function renderTreeList(nodes){
+    if (!nodes.length) return '<div class="subtle">No staff in this group.</div>';
+    const rec = (list)=>{
+      if (!list.length) return '';
+      return '<ul>' + list.map(p=>{
+        const capText = `${p.currentReports}/${p.Capacity||0}`;
+        const capCls = p.capStatus==='under' ? 'cap-chip cap-under'
+                    : p.capStatus==='full' ? 'cap-chip cap-full'
+                    : 'cap-chip cap-over';
+        const capLabel = p.capStatus==='under' ? 'Under'
+                        : p.capStatus==='full' ? 'At'
+                        : 'Over';
+        return `<li>
+          <div class="org-person">
+            <span class="org-person-name">${p.FullName || ''}</span>
+            ${p.Grade ? `<span class="org-person-role">${p.Grade}</span>` : ''}
+            ${p.IsManager ? `<span class="${capCls}"><span>${capLabel}</span><strong>${capText}</strong></span>` : ''}
+          </div>
+          ${rec(p.children || [])}
+        </li>`;
+      }).join('') + '</ul>';
+    };
+    return `<div>${rec(nodes)}</div>`;
+  }
+
+  function renderOrgTree(){
+    const people = state.people || [];
+    if (!people.length){
+      orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab first.</div>';
+      return;
+    }
+    const mode = orgGroupBy.value;
+    const groups = new Map();
+    people.forEach(p=>{
+      let key='';
+      if (mode==='region') key = p.Region || 'Unknown region';
+      else if (mode==='discipline') key = p.Discipline || 'Unknown discipline';
+      else key = (p.Region||'Unknown region') + ' • ' + (p.Discipline||'Unknown discipline');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(p);
+    });
+    let html='';
+    groups.forEach((arr, label)=>{
+      const roots = buildHierarchy(arr);
+      html += `<div class="org-group">
+        <div class="org-group-title">${label}</div>
+        ${renderTreeList(roots)}
+      </div>`;
+    });
+    orgTreeRoot.innerHTML = html || '<div class="subtle">Nothing to display.</div>';
+  }
+
+  orgBuildBtn.addEventListener('click', renderOrgTree);
+
+  // --- Tabs --------------------------------------------------------------
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b===btn));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id === 'tab-'+tab));
+    });
+  });
+
+  // --- Export / Clear / Load buttons -------------------------------------
+  const fileInput = document.getElementById('fileInput');
+  document.getElementById('btnLoad').addEventListener('click', ()=> fileInput.click());
+  document.getElementById('btnClear').addEventListener('click', ()=>{
+    state.rawObjects = [];
+    state.people = [];
+    renderAll();
+  });
+  fileInput.addEventListener('change', e=>{
+    const file = e.target.files && e.target.files[0];
+    if (file) handleFile(file);
+  });
+
+  document.getElementById('btnExport').addEventListener('click', ()=>{
+    const people = state.people || [];
+    if (!people.length){
+      alert('No data to export.');
+      return;
+    }
+    const rows = [
+      ['Surname','First Forename','Grade','Grade Level','Discipline','Office','Region','Area','Manager','Is Manager','Capacity','Current reports']
+    ];
+    people.forEach(p=>{
+      rows.push([
+        p.Surname || '',
+        p.FirstForename || '',
+        p.Grade || '',
+        p.GradeLevel || '',
+        p.Discipline || '',
+        p.Office || '',
+        p.Region || '',
+        p.Area || '',
+        p.Manager || '',
+        p.IsManager ? 'Y' : '',
+        p.Capacity || 0,
+        p.currentReports || 0
+      ]);
+    });
+    const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+    const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'gleeds-line-management-export.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // --- Global render -----------------------------------------------------
+  function renderAll(){
+    renderSummary();
+    renderPeopleTable();
+    fillFilterOptions();
+    const hasData = (state.people || []).length>0;
+    orgBuildBtn.disabled = !hasData;
+    if (!hasData){
+      fmResults.innerHTML = '<div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>';
+      orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>';
+    }
+  }
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
