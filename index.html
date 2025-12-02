@@ -425,11 +425,11 @@
     .org-group-tree-btn:hover { background: #1b1f2c; }
 
     .org-tree-detail {
-      margin-top: 14px;
-      padding: 14px 12px;
-      border-radius: 18px;
+      margin-top: 16px;
+      padding: 16px 20px;
+      border-radius: 24px;
       border: 1px solid var(--border-soft);
-      background: var(--bg-card-soft);
+      background: #18191f;
     }
     .org-tree-detail.empty { color: var(--text-soft); }
 
@@ -437,15 +437,38 @@
       font-weight: 700;
       font-size: 14px;
       letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #9fa4b8;
+      margin-bottom: 12px;
     }
 
     .org-tree-grid {
+      position: relative;
       margin-top: 12px;
       display: grid;
-      gap: 16px;
+      gap: 32px;
     }
 
-    .org-tree-column { display: flex; flex-direction: column; gap: 8px; }
+    .org-tree-column {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .org-tree-node {
+      position: relative;
+    }
+    .org-tree-node::before {
+      content: "";
+      position: absolute;
+      top: -16px;
+      left: 50%;
+      width: 2px;
+      height: 16px;
+      background: rgba(255,255,255,0.07);
+    }
+    .org-tree-column:first-child .org-tree-node::before { display: none; }
 
     .org-node-card {
       display: flex;
@@ -1098,7 +1121,7 @@
   function buildOrgTreeForGroup(groupPeople){
     const byName = new Map();
     groupPeople.forEach(p=>{
-      byName.set(canonicalName(p.Name), p);
+      byName.set(canonicalName(p.FullName), p);
     });
 
     const nodesByPerson = new Map();
@@ -1153,6 +1176,15 @@
     return levels;
   }
 
+  function sortLevel(nodes){
+    nodes.sort((a,b)=>{
+      const ga = gradeIndex(a.person.Grade);
+      const gb = gradeIndex(b.person.Grade);
+      if (ga !== gb) return ga - gb;
+      return (a.person.FullName || '').localeCompare(b.person.FullName || '');
+    });
+  }
+
   function createPersonNodeCard(person){
     const card = document.createElement('div');
     card.className = 'org-node-card';
@@ -1185,7 +1217,8 @@
 
     const roots = buildOrgTreeForGroup(groupPeople);
     const levels = groupNodesByDepth(roots);
-    const maxDepth = Math.max(...Array.from(levels.keys()));
+    const depthKeys = Array.from(levels.keys());
+    const maxDepth = depthKeys.length ? Math.max(...depthKeys) : 0;
 
     orgTreeDetail.classList.remove('empty');
     orgTreeDetail.innerHTML = '';
@@ -1205,10 +1238,12 @@
       const col = document.createElement('div');
       col.className = 'org-tree-column';
       const nodes = levels.get(depth) || [];
-      sortNodes(nodes);
+      sortLevel(nodes);
       nodes.forEach(node=>{
         renderedCount++;
-        col.appendChild(createPersonNodeCard(node.person));
+        const card = createPersonNodeCard(node.person);
+        card.classList.add('org-tree-node');
+        col.appendChild(card);
       });
       grid.appendChild(col);
     }
