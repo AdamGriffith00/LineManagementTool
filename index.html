@@ -581,6 +581,19 @@
     managersByName: new Map(),
   };
 
+  const GRADE_ORDER = [
+    'Senior Director',
+    'Director',
+    'Project Director',
+    'Associate Director',
+    'Executive Cost Manager',
+    'Senior Cost Manager',
+    'Cost Manager',
+    'Assistant Cost Manager',
+    'Graduate Cost Manager',
+    'Trainee Cost Manager'
+  ];
+
   // --- Utility ------------------------------------------------------------
   function norm(s){ return (s||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,''); }
   function swapCommaName(name){
@@ -1023,7 +1036,60 @@
   const orgBuildBtn = document.getElementById('orgBuildBtn');
   const orgTreeRoot = document.getElementById('orgTreeRoot');
 
-  function renderOrgGroupFlat(container, groupLabel, groupPeople){
+  function canonicalName(name){
+    return (name || '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  function gradeIndex(grade){
+    const idx = GRADE_ORDER.indexOf((grade || '').trim());
+    return idx === -1 ? GRADE_ORDER.length : idx;
+  }
+
+  function sortNodes(nodes){
+    nodes.sort((a,b)=>{
+      const ga = gradeIndex(a.person.Grade);
+      const gb = gradeIndex(b.person.Grade);
+      if (ga !== gb) return ga - gb;
+      return (a.person.FullName || '').localeCompare(b.person.FullName || '');
+    });
+  }
+
+  function renderOrgNode(parentEl, node, depth){
+    const { person, children } = node;
+    const row = document.createElement('div');
+    row.className = 'org-node-row';
+    row.style.marginLeft = (depth * 24) + 'px';
+
+    const main = document.createElement('div');
+    main.className = 'org-person';
+    main.innerHTML = `
+      <span class="org-person-name">${person.FullName || ''}</span>
+      ${person.Grade ? `<span class="org-person-role">${person.Grade}</span>` : ''}
+      ${person.Discipline ? `<span class="org-person-tag">${person.Discipline}</span>` : ''}
+      ${person.Office ? `<span class="org-person-tag">${person.Office}</span>` : ''}
+      ${person.Region ? `<span class="org-person-tag">${person.Region}</span>` : ''}
+    `;
+    row.appendChild(main);
+
+    if (person.IsManager || person.currentReports>0){
+      const capSpan = document.createElement('span');
+      capSpan.innerHTML = capacityChip(person,{showIfNonManager:true});
+      row.appendChild(capSpan);
+    }
+
+    parentEl.appendChild(row);
+    let count = 1;
+
+    if (children && children.length){
+      sortNodes(children);
+      children.forEach(child => {
+        count += renderOrgNode(parentEl, child, depth + 1);
+      });
+    }
+    return count;
+  }
+
+  function renderOrgGroupHierarchical(container, groupLabel, roots, groupPeople){
     const bodyEl = document.createElement('div');
     bodyEl.className = 'org-tree-group-body';
     container.appendChild(bodyEl);
@@ -1032,32 +1098,13 @@
     list.className = 'org-group-list';
     bodyEl.appendChild(list);
 
-    groupPeople.forEach(p=>{
-      const row = document.createElement('div');
-      row.className = 'org-node-row';
-
-      const main = document.createElement('div');
-      main.className = 'org-person';
-      main.innerHTML = `
-        <span class="org-person-name">${p.FullName || ''}</span>
-        ${p.Grade ? `<span class="org-person-role">${p.Grade}</span>` : ''}
-        ${p.Discipline ? `<span class="org-person-tag">${p.Discipline}</span>` : ''}
-        ${p.Office ? `<span class="org-person-tag">${p.Office}</span>` : ''}
-        ${p.Region ? `<span class="org-person-tag">${p.Region}</span>` : ''}
-      `;
-      row.appendChild(main);
-
-      if (p.IsManager){
-        const capSpan = document.createElement('span');
-        capSpan.innerHTML = capacityChip(p,{showIfNonManager:true});
-        row.appendChild(capSpan);
-      }
-
-      list.appendChild(row);
+    let renderedCount = 0;
+    sortNodes(roots);
+    roots.forEach(node => {
+      renderedCount += renderOrgNode(list, node, 0);
     });
 
-    const renderedRows = list.querySelectorAll('.org-node-row').length;
-    console.log('Organigram DOM rows for', groupLabel, ':', renderedRows, 'expected:', groupPeople.length);
+    console.log('Organigram DOM rows for', groupLabel, ':', renderedCount, 'expected:', groupPeople.length);
   }
 
   function renderOrgTree(){
@@ -1091,7 +1138,34 @@
     const keys = Object.keys(groups).sort((a,b)=> a.localeCompare(b));
     orgTreeRoot.innerHTML = '';
 
-    const renderGroup = (groupKey, group)=>{
+    keys.forEach(key=>{
+      const group = groups[key];
+      console.log('Organigram group', key, 'members:', group.people.length);
+
+      const byName = new Map();
+      group.people.forEach(p=>{
+        byName.set(canonicalName(p.Name), p);
+      });
+
+      const nodesByPerson = new Map();
+      group.people.forEach(p=>{
+        nodesByPerson.set(p, { person: p, children: [] });
+      });
+
+      const roots = [];
+      const groupSet = new Set(group.people);
+      group.people.forEach(p=>{
+        const node = nodesByPerson.get(p);
+        const mgrName = canonicalName(p.Manager);
+        const managerPerson = byName.get(mgrName);
+        if (managerPerson && managerPerson !== p && groupSet.has(managerPerson)){
+          const mgrNode = nodesByPerson.get(managerPerson);
+          mgrNode.children.push(node);
+        } else {
+          roots.push(node);
+        }
+      });
+
       const groupEl = document.createElement('div');
       groupEl.className = 'org-group';
 
@@ -1100,14 +1174,8 @@
       titleEl.textContent = group.label;
       groupEl.appendChild(titleEl);
 
-      renderOrgGroupFlat(groupEl, groupKey, group.people);
+      renderOrgGroupHierarchical(groupEl, key, roots, group.people);
       orgTreeRoot.appendChild(groupEl);
-    };
-
-    keys.forEach(key=>{
-      const group = groups[key];
-      console.log('Organigram group', key, 'members:', group.people.length);
-      renderGroup(key, group);
     });
 
     if (!keys.length){
