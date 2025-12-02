@@ -382,24 +382,102 @@
       font-size: 12px;
     }
 
-    .org-group-title {
-      font-size: 12px;
-      color: var(--text-soft);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin: 8px 0 4px;
+    .org-group {
+      border: 1px solid var(--border-soft);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: #0f1118;
+      margin-bottom: 8px;
     }
 
-    .org-tree ul {
-      list-style: none;
-      margin: 0;
-      padding-left: 14px;
-      border-left: 1px dashed #2b3140;
+    .org-group-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: space-between;
+      cursor: pointer;
     }
-    .org-tree li {
-      margin: 3px 0;
-      padding-left: 6px;
+
+    .org-group-title {
+      font-size: 13px;
+      color: var(--text-main);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    .org-group-meta {
+      color: var(--text-soft);
+      font-size: 12px;
+      flex: 1;
+      padding-left: 8px;
+    }
+
+    .org-group-tree-btn {
+      background: #161a24;
+      color: var(--text-main);
+      border: 1px solid var(--border-soft);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .org-group-tree-btn:hover { background: #1b1f2c; }
+
+    .org-tree-detail {
+      margin-top: 16px;
+      padding: 16px 20px;
+      border-radius: 24px;
+      border: 1px solid var(--border-soft);
+      background: #18191f;
+    }
+    .org-tree-detail.empty { color: var(--text-soft); }
+
+    .org-tree-title {
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #9fa4b8;
+      margin-bottom: 12px;
+    }
+
+    .org-tree-grid {
       position: relative;
+      margin-top: 12px;
+      display: grid;
+      gap: 32px;
+    }
+
+    .org-tree-column {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .org-tree-node {
+      position: relative;
+    }
+    .org-tree-node::before {
+      content: "";
+      position: absolute;
+      top: -16px;
+      left: 50%;
+      width: 2px;
+      height: 16px;
+      background: rgba(255,255,255,0.07);
+    }
+    .org-tree-column:first-child .org-tree-node::before { display: none; }
+
+    .org-node-card {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 12px;
+      border: 1px solid #262a35;
+      background: #111420;
     }
 
     .org-person {
@@ -528,6 +606,9 @@
           <div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>
         </div>
       </div>
+      <section id="org-tree-detail" class="org-tree-detail empty">
+        <div class="subtle">Click a group to view its hierarchy.</div>
+      </section>
     </div>
   </section>
 </div>
@@ -543,8 +624,8 @@
     GradeLevel: ['Grade Level','GradeLevel','Level','Band'],
     Discipline: ['Discipline','Function','Department','Practice'],
     Office: ['Office','Office/Location','Location','Base Office'],
-    Region: ['Region'],
-    Area: ['Area'],
+    Region: ['Region','Area','Region/Area','Geography','Territory'],
+    Area: ['Area','Sub Region','Sub-Region','Subregion'],
     Technical: ['Technical','Technical/Operational'],
     DirectorName: ['Director Name','Director','Line Director'],
     Manager: ['Manager','Line Manager','Reporting Manager','Reports To','Manager Name'],
@@ -562,8 +643,48 @@
     managersByName: new Map(),
   };
 
+  const GRADE_ORDER = [
+    'Senior Director',
+    'Director',
+    'Project Director',
+    'Associate Director',
+    'Executive Cost Manager',
+    'Senior Cost Manager',
+    'Cost Manager',
+    'Assistant Cost Manager',
+    'Graduate Cost Manager',
+    'Trainee Cost Manager'
+  ];
+
   // --- Utility ------------------------------------------------------------
   function norm(s){ return (s||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,''); }
+  function swapCommaName(name){
+    if (!name) return '';
+    const parts = name.split(',').map(p=>p.trim()).filter(Boolean);
+    if (parts.length === 2){
+      return `${parts[1]} ${parts[0]}`;
+    }
+    return name.replace(/\s+/g,' ');
+  }
+  function canonicalKey(value){
+    const base = swapCommaName((value||'').toString().normalize('NFKD').replace(/[\u0300-\u036f]/g,''));
+    return base.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  }
+
+  function tidyLabel(value){
+    return (value||'').toString().replace(/\s+/g,' ').trim();
+  }
+
+  function gradeForCapacity(value){
+    const clean = tidyLabel(value);
+    const lower = clean.toLowerCase();
+    // Treat bare Cost Manager / Quantity Surveyor roles as Professional for
+    // capacity defaults while leaving the displayed grade untouched.
+    if (lower === 'cost manager' || lower === 'quantity surveyor'){
+      return 'Professional';
+    }
+    return clean;
+  }
 
   function buildKeyMap(firstRow){
     const keys = Object.keys(firstRow || {});
@@ -596,6 +717,27 @@
   function toNum(v){
     const n = parseFloat((v||'').toString().replace(',','.'));
     return isNaN(n) ? 0 : n;
+  }
+
+  function capacityMeta(p){
+    const used = p.currentReports || 0;
+    const cap = p.Capacity || 0;
+    const status = p.capStatus || 'full';
+    const cls = status==='under' ? 'cap-chip cap-under'
+              : status==='full' ? 'cap-chip cap-full'
+              : 'cap-chip cap-over';
+    const label = status==='under' ? 'Under'
+                : status==='full' ? 'At'
+                : 'Over';
+    return {used, cap, cls, label};
+  }
+
+  function capacityChip(p, {showIfNonManager=false}={}){
+    if (!p) return '';
+    const isMgr = p.IsManager || p.currentReports>0;
+    if (!showIfNonManager && !isMgr) return `${p.Capacity || 0}`;
+    const meta = capacityMeta(p);
+    return `<span class="${meta.cls}"><span>${meta.label}</span><strong>• ${meta.used} / ${meta.cap}</strong></span>`;
   }
 
   // --- CSV / XLSX parsing -------------------------------------------------
@@ -646,7 +788,10 @@
     if (!rows.length) return [];
     while(rows.length && rows[0].every(c=>!String(c||'').trim())) rows.shift();
     if (!rows.length) return [];
-    const heads = rows[0].map(h=>(h||'').trim());
+    const heads = rows[0].map(h=>{
+      const clean = (h||'').replace(/^\ufeff/,'');
+      return clean.trim();
+    });
     return rows.slice(1).map(r=>{
       const o={};
       heads.forEach((h,idx)=>{ o[h] = (r[idx] ?? ''); });
@@ -719,30 +864,33 @@
     const people = objs.map((row, idx)=>{
       const p = {};
       p.id = 'p'+(idx+1);
-      p.Surname = getVal(keyMap,row,'Surname');
-      p.FirstForename = getVal(keyMap,row,'FirstForename');
-      p.CostCentre = getVal(keyMap,row,'CostCentre');
-      p.Grade = getVal(keyMap,row,'Grade');
-      p.GradeLevel = getVal(keyMap,row,'GradeLevel');
-      p.Discipline = getVal(keyMap,row,'Discipline');
-      p.Office = getVal(keyMap,row,'Office');
-      p.Region = getVal(keyMap,row,'Region');
-      p.Area = getVal(keyMap,row,'Area');
-      p.Technical = getVal(keyMap,row,'Technical');
-      p.DirectorName = getVal(keyMap,row,'DirectorName');
-      p.Manager = getVal(keyMap,row,'Manager');
-      p.Appraiser = getVal(keyMap,row,'Appraiser');
-      p.ExpenseApprover = getVal(keyMap,row,'ExpenseApprover');
+      p.Surname = tidyLabel(getVal(keyMap,row,'Surname'));
+      p.FirstForename = tidyLabel(getVal(keyMap,row,'FirstForename'));
+      p.CostCentre = tidyLabel(getVal(keyMap,row,'CostCentre'));
+      const gradeRaw = tidyLabel(getVal(keyMap,row,'Grade'));
+      p.Grade = gradeRaw; // Preserve uploaded grade for display
+      p.GradeLevel = tidyLabel(getVal(keyMap,row,'GradeLevel'));
+      p.Discipline = tidyLabel(getVal(keyMap,row,'Discipline'));
+      p.Office = tidyLabel(getVal(keyMap,row,'Office'));
+      p.Region = tidyLabel(getVal(keyMap,row,'Region'));
+      p.Area = tidyLabel(getVal(keyMap,row,'Area'));
+      p.Technical = tidyLabel(getVal(keyMap,row,'Technical'));
+      p.DirectorName = tidyLabel(getVal(keyMap,row,'DirectorName'));
+      p.Manager = tidyLabel(getVal(keyMap,row,'Manager'));
+      p.Appraiser = tidyLabel(getVal(keyMap,row,'Appraiser'));
+      p.ExpenseApprover = tidyLabel(getVal(keyMap,row,'ExpenseApprover'));
       p.IsManager = toBool(getVal(keyMap,row,'IsManager'));
       p.IsDirector = toBool(getVal(keyMap,row,'IsDirector'));
       p.IsAppraiser = toBool(getVal(keyMap,row,'IsAppraiser'));
       p.Capacity = toNum(getVal(keyMap,row,'Capacity'));
       // apply grade rules if capacity not set or zero
       if (!p.Capacity || p.Capacity <= 0){
-        p.Capacity = gradeDefaultCapacity(p.Grade, p.GradeLevel);
+        const gradeForCap = gradeForCapacity(p.Grade);
+        p.Capacity = gradeDefaultCapacity(gradeForCap, p.GradeLevel);
       }
       p.FullName = (p.FirstForename + ' ' + p.Surname).trim();
-      p.fullNameKey = p.FullName.toLowerCase();
+      p.fullNameKey = canonicalKey(p.FullName);
+      p.managerKey = canonicalKey(p.Manager);
       return p;
     });
 
@@ -750,7 +898,7 @@
     people.forEach(p=>{ if (p.fullNameKey) byName.set(p.fullNameKey, p); });
     people.forEach(p=>{ p.currentReports = 0; });
     people.forEach(p=>{
-      const mgr = (p.Manager || '').toString().trim().toLowerCase();
+      const mgr = p.managerKey;
       if (!mgr) return;
       const m = byName.get(mgr);
       if (m) m.currentReports++;
@@ -759,7 +907,8 @@
     people.forEach(p=>{
       const cap = p.Capacity || 0;
       const used = p.currentReports || 0;
-      p.freeSlots = Math.max(cap - used, 0);
+      const free = cap - used;
+      p.freeSlots = free;
       if (cap === 0){
         if (used>0)      p.capStatus = 'over';
         else             p.capStatus = 'full';
@@ -784,11 +933,12 @@
     const badges = document.getElementById('summaryBadges');
     const people = state.people || [];
     const total = people.length;
-    const managers = people.filter(p=>p.IsManager || p.currentReports>0).length;
+    const managerList = people.filter(p=>p.IsManager || p.currentReports>0);
+    const managers = managerList.length;
     const top = people.filter(p=>!p.Manager || !p.Manager.toString().trim()).length;
-    const under = people.filter(p=>p.IsManager && p.capStatus==='under').length;
-    const full = people.filter(p=>p.IsManager && p.capStatus==='full').length;
-    const over = people.filter(p=>p.IsManager && p.capStatus==='over').length;
+    const under = managerList.filter(p=>p.capStatus==='under').length;
+    const full = managerList.filter(p=>p.capStatus==='full').length;
+    const over = managerList.filter(p=>p.capStatus==='over').length;
 
     line.innerHTML = `
       <span class="label">People:</span> <span class="value">${total}</span>
@@ -839,18 +989,12 @@
       return hay.includes(query);
     });
 
+    if (!filtered.length){
+      peopleBody.innerHTML = `<tr><td colspan="${displayCols.length}" class="subtle">${people.length ? 'No matches for that search.' : 'Upload a CSV/XLSX to see people here.'}</td></tr>`;
+      return;
+    }
+
     peopleBody.innerHTML = filtered.map(p=>{
-      const capChip = (function(){
-        const text = `${p.currentReports}/${p.Capacity||0}`;
-        if (!p.IsManager) return text;
-        const cls = p.capStatus==='under' ? 'cap-chip cap-under'
-                  : p.capStatus==='full' ? 'cap-chip cap-full'
-                  : 'cap-chip cap-over';
-        const label = p.capStatus==='under' ? 'Under'
-                    : p.capStatus==='full' ? 'At'
-                    : 'Over';
-        return `<span class="${cls}"><span>${label}</span><strong>${text}</strong></span>`;
-      })();
       return `
         <tr>
           <td>${p.FullName || ''}</td>
@@ -862,8 +1006,8 @@
           <td>${p.Area || ''}</td>
           <td>${p.DirectorName || ''}</td>
           <td>${p.Manager || ''}</td>
-          <td>${p.IsManager ? 'Y' : ''}</td>
-          <td>${capChip}</td>
+          <td>${p.IsManager || p.currentReports>0 ? 'Y' : 'N'}</td>
+          <td>${capacityChip(p)}</td>
           <td>${p.currentReports}</td>
         </tr>
       `;
@@ -902,13 +1046,6 @@
       return;
     }
     fmResults.innerHTML = list.map(p=>{
-      const capCls = p.capStatus==='under' ? 'cap-chip cap-under'
-                  : p.capStatus==='full' ? 'cap-chip cap-full'
-                  : 'cap-chip cap-over';
-      const capText = `${p.currentReports}/${p.Capacity||0}`;
-      const capLabel = p.capStatus==='under' ? 'Under'
-                      : p.capStatus==='full' ? 'At'
-                      : 'Over';
       return `
         <div class="manager-row">
           <div class="manager-main">
@@ -920,9 +1057,7 @@
               ${p.Region ? `<span>${p.Region}</span>` : ''}
             </div>
           </div>
-          <div class="${capCls}">
-            <span>${capLabel}</span><strong>${capText}</strong>
-          </div>
+          ${capacityChip(p,{showIfNonManager:true})}
         </div>
       `;
     }).join('');
@@ -935,13 +1070,18 @@
     const grade = fmGrade.value;
     const minFree = parseInt(fmFreeCap.value || '0', 10);
     const candidates = people.filter(p=>{
-      if (!p.IsManager) return false;
+      const isManager = p.IsManager || p.currentReports>0;
+      if (!isManager) return false;
       if (disc && p.Discipline !== disc) return false;
       if (reg && p.Region !== reg) return false;
       if (grade && p.Grade !== grade) return false;
       if ((p.freeSlots || 0) < minFree) return false;
       return true;
-    }).sort((a,b)=> (b.freeSlots||0) - (a.freeSlots||0)).reverse();
+    }).sort((a,b)=>{
+      const freeDiff = (b.freeSlots||0) - (a.freeSlots||0);
+      if (freeDiff !== 0) return freeDiff;
+      return a.FullName.localeCompare(b.FullName);
+    });
     renderFindManagerResults(candidates);
   });
 
@@ -957,75 +1097,240 @@
   const orgGroupBy = document.getElementById('orgGroupBy');
   const orgBuildBtn = document.getElementById('orgBuildBtn');
   const orgTreeRoot = document.getElementById('orgTreeRoot');
+  const orgTreeDetail = document.getElementById('org-tree-detail');
+  let selectedOrgGroup = null;
 
-  function buildHierarchy(people){
-    const byId = new Map();
-    people.forEach(p=>{ p.children = []; byId.set(p.id, p); });
-    const nameToId = new Map();
-    people.forEach(p=>{ if (p.fullNameKey) nameToId.set(p.fullNameKey, p.id); });
+  function canonicalName(name){
+    return (name || '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  function gradeIndex(grade){
+    const idx = GRADE_ORDER.indexOf((grade || '').trim());
+    return idx === -1 ? GRADE_ORDER.length : idx;
+  }
+
+  function sortNodes(nodes){
+    nodes.sort((a,b)=>{
+      const ga = gradeIndex(a.person.Grade);
+      const gb = gradeIndex(b.person.Grade);
+      if (ga !== gb) return ga - gb;
+      return (a.person.FullName || '').localeCompare(b.person.FullName || '');
+    });
+  }
+
+  function buildOrgTreeForGroup(groupPeople){
+    const byName = new Map();
+    groupPeople.forEach(p=>{
+      const key = canonicalName(p.Name || p.FullName);
+      byName.set(key, p);
+    });
+
+    const nodesByPerson = new Map();
+    groupPeople.forEach(p=>{
+      nodesByPerson.set(p, { person: p, children: [], depth: 0 });
+    });
+
     const roots = [];
-    people.forEach(p=>{
-      const mgrName = (p.Manager||'').toString().trim().toLowerCase();
-      const mgrId = mgrName ? nameToId.get(mgrName) : null;
-      if (mgrId && byId.has(mgrId) && mgrId !== p.id){
-        byId.get(mgrId).children.push(p);
+    const groupSet = new Set(groupPeople);
+    groupPeople.forEach(p=>{
+      const node = nodesByPerson.get(p);
+      const mgrName = canonicalName(p.Manager);
+      const managerPerson = byName.get(mgrName);
+      if (managerPerson && managerPerson !== p && groupSet.has(managerPerson)){
+        const mgrNode = nodesByPerson.get(managerPerson);
+        mgrNode.children.push(node);
       } else {
-        roots.push(p);
+        roots.push(node);
       }
     });
+
+    if (!roots.length){
+      roots.push(...nodesByPerson.values());
+    }
+
+    function markDepth(node, depth){
+      node.depth = depth;
+      (node.children||[]).forEach(child=>markDepth(child, depth+1));
+    }
+    roots.forEach(r=>markDepth(r,0));
+
+    sortNodes(roots);
+    roots.forEach(sortChildrenRecursive);
+
     return roots;
   }
 
-  function renderTreeList(nodes){
-    if (!nodes.length) return '<div class="subtle">No staff in this group.</div>';
-    const rec = (list)=>{
-      if (!list.length) return '';
-      return '<ul>' + list.map(p=>{
-        const capText = `${p.currentReports}/${p.Capacity||0}`;
-        const capCls = p.capStatus==='under' ? 'cap-chip cap-under'
-                    : p.capStatus==='full' ? 'cap-chip cap-full'
-                    : 'cap-chip cap-over';
-        const capLabel = p.capStatus==='under' ? 'Under'
-                        : p.capStatus==='full' ? 'At'
-                        : 'Over';
-        return `<li>
-          <div class="org-person">
-            <span class="org-person-name">${p.FullName || ''}</span>
-            ${p.Grade ? `<span class="org-person-role">${p.Grade}</span>` : ''}
-            ${p.IsManager ? `<span class="${capCls}"><span>${capLabel}</span><strong>${capText}</strong></span>` : ''}
-          </div>
-          ${rec(p.children || [])}
-        </li>`;
-      }).join('') + '</ul>';
-    };
-    return `<div>${rec(nodes)}</div>`;
+  function sortChildrenRecursive(node){
+    if (!node.children || !node.children.length) return;
+    sortNodes(node.children);
+    node.children.forEach(sortChildrenRecursive);
+  }
+
+  function groupNodesByDepth(roots){
+    const levels = new Map();
+    function visit(node){
+      const depth = node.depth || 0;
+      if (!levels.has(depth)) levels.set(depth, []);
+      levels.get(depth).push(node);
+      (node.children||[]).forEach(visit);
+    }
+    roots.forEach(visit);
+    return levels;
+  }
+
+  function sortLevel(nodes){
+    nodes.sort((a,b)=>{
+      const ga = gradeIndex(a.person.Grade);
+      const gb = gradeIndex(b.person.Grade);
+      if (ga !== gb) return ga - gb;
+      return (a.person.FullName || '').localeCompare(b.person.FullName || '');
+    });
+  }
+
+  function createPersonNodeCard(person){
+    const card = document.createElement('div');
+    card.className = 'org-node-card';
+
+    const main = document.createElement('div');
+    main.className = 'org-person';
+    main.innerHTML = `
+      <span class="org-person-name">${person.FullName || ''}</span>
+      ${person.Grade ? `<span class="org-person-role">${person.Grade}</span>` : ''}
+      ${person.Discipline ? `<span class="org-person-tag">${person.Discipline}</span>` : ''}
+      ${person.Office ? `<span class="org-person-tag">${person.Office}</span>` : ''}
+    `;
+    card.appendChild(main);
+
+    if (person.IsManager || person.currentReports>0){
+      const capSpan = document.createElement('span');
+      capSpan.innerHTML = capacityChip(person,{showIfNonManager:true});
+      card.appendChild(capSpan);
+    }
+
+    return card;
+  }
+
+  function renderRegionTreeDetail(groupLabel, groupPeople){
+    if (!groupPeople || !groupPeople.length){
+      orgTreeDetail.classList.add('empty');
+      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
+      return;
+    }
+
+    const roots = buildOrgTreeForGroup(groupPeople);
+    const levels = groupNodesByDepth(roots);
+    const depthKeys = Array.from(levels.keys());
+    const maxDepth = depthKeys.length ? Math.max(...depthKeys) : 0;
+
+    orgTreeDetail.classList.remove('empty');
+    orgTreeDetail.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.className = 'org-tree-title';
+    title.textContent = `${groupLabel.toUpperCase()} – Hierarchy`;
+    orgTreeDetail.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'org-tree-grid';
+    grid.style.gridTemplateColumns = `repeat(${maxDepth + 1}, minmax(0, 1fr))`;
+    orgTreeDetail.appendChild(grid);
+
+    for (let depth = 0; depth <= maxDepth; depth++){
+      const col = document.createElement('div');
+      col.className = 'org-tree-column';
+      const nodes = levels.get(depth) || [];
+      sortLevel(nodes);
+      nodes.forEach(node=>{
+        const card = createPersonNodeCard(node.person);
+        card.classList.add('org-tree-node');
+        col.appendChild(card);
+      });
+      grid.appendChild(col);
+    }
+
+    const cards = orgTreeDetail.querySelectorAll('.org-tree-node');
+    console.log('Organigram DOM rows for', groupLabel, ':', cards.length, 'expected:', groupPeople.length);
   }
 
   function renderOrgTree(){
     const people = state.people || [];
     if (!people.length){
       orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab first.</div>';
+      orgTreeDetail.classList.add('empty');
+      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
       return;
     }
     const mode = orgGroupBy.value;
-    const groups = new Map();
+    const groups = {};
+
+    const computeGroupKey = (person)=>{
+      const regionLabel = person.Region || 'Unknown';
+      const discLabel = person.Discipline || 'Unknown';
+      if (mode === 'region') return regionLabel;
+      if (mode === 'discipline') return discLabel;
+      return `${regionLabel} • ${discLabel}`;
+    };
+
     people.forEach(p=>{
-      let key='';
-      if (mode==='region') key = p.Region || 'Unknown region';
-      else if (mode==='discipline') key = p.Discipline || 'Unknown discipline';
-      else key = (p.Region||'Unknown region') + ' • ' + (p.Discipline||'Unknown discipline');
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(p);
+      const key = computeGroupKey(p);
+      if (!groups[key]) groups[key] = { label: key, people: [] };
+      groups[key].people.push(p);
     });
-    let html='';
-    groups.forEach((arr, label)=>{
-      const roots = buildHierarchy(arr);
-      html += `<div class="org-group">
-        <div class="org-group-title">${label}</div>
-        ${renderTreeList(roots)}
-      </div>`;
+
+    const totalInGroups = Object.values(groups).reduce((sum,g)=> sum + g.people.length, 0);
+    if (totalInGroups !== people.length){
+      console.warn('Organigram grouping mismatch', { totalInGroups, peopleLength: people.length });
+    }
+
+    selectedOrgGroup = null;
+    orgTreeDetail.classList.add('empty');
+    orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
+    const keys = Object.keys(groups).sort((a,b)=> a.localeCompare(b));
+    orgTreeRoot.innerHTML = '';
+
+    keys.forEach(key=>{
+      const group = groups[key];
+      console.log('Organigram group', key, 'members:', group.people.length);
+
+      const groupEl = document.createElement('div');
+      groupEl.className = 'org-group';
+
+      const header = document.createElement('div');
+      header.className = 'org-group-header';
+      header.dataset.groupKey = key;
+
+      const titleEl = document.createElement('span');
+      titleEl.className = 'org-group-title';
+      titleEl.textContent = group.label;
+      header.appendChild(titleEl);
+
+      const managerList = group.people.filter(p=>p.IsManager || p.currentReports>0);
+      const meta = document.createElement('span');
+      meta.className = 'org-group-meta';
+      meta.textContent = `${group.people.length} people${managerList.length ? ` • ${managerList.length} managers` : ''}`;
+      header.appendChild(meta);
+
+      const btn = document.createElement('button');
+      btn.className = 'org-group-tree-btn';
+      btn.textContent = 'View tree';
+      header.appendChild(btn);
+
+      const handleSelect = ()=>{
+        selectedOrgGroup = key;
+        document.querySelectorAll('.org-group-header').forEach(h=>h.classList.toggle('active', h.dataset.groupKey===key));
+        renderRegionTreeDetail(group.label, group.people);
+      };
+
+      header.addEventListener('click', handleSelect);
+      btn.addEventListener('click', e=>{ e.stopPropagation(); handleSelect(); });
+
+      groupEl.appendChild(header);
+      orgTreeRoot.appendChild(groupEl);
     });
-    orgTreeRoot.innerHTML = html || '<div class="subtle">Nothing to display.</div>';
+
+    if (!keys.length){
+      orgTreeRoot.innerHTML = '<div class="subtle">Nothing to display.</div>';
+    }
   }
 
   orgBuildBtn.addEventListener('click', renderOrgTree);
@@ -1045,11 +1350,14 @@
   document.getElementById('btnClear').addEventListener('click', ()=>{
     state.rawObjects = [];
     state.people = [];
+    fileInput.value = '';
+    peopleSearch.value = '';
     renderAll();
   });
   fileInput.addEventListener('change', e=>{
     const file = e.target.files && e.target.files[0];
     if (file) handleFile(file);
+    e.target.value = '';
   });
 
   document.getElementById('btnExport').addEventListener('click', ()=>{
@@ -1072,7 +1380,7 @@
         p.Region || '',
         p.Area || '',
         p.Manager || '',
-        p.IsManager ? 'Y' : '',
+        (p.IsManager || p.currentReports>0) ? 'Y' : '',
         p.Capacity || 0,
         p.currentReports || 0
       ]);
@@ -1099,6 +1407,11 @@
     if (!hasData){
       fmResults.innerHTML = '<div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>';
       orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>';
+      orgTreeDetail.classList.add('empty');
+      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
+    } else if (!selectedOrgGroup){
+      orgTreeDetail.classList.add('empty');
+      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
     }
   }
 
