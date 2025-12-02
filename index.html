@@ -581,10 +581,12 @@
     return (value||'').toString().replace(/\s+/g,' ').trim();
   }
 
-  function normalizeGrade(value){
+  function gradeForCapacity(value){
     const clean = tidyLabel(value);
     const lower = clean.toLowerCase();
-    if (lower.includes('cost manager') || lower.includes('quantity surveyor')){
+    // Treat bare Cost Manager / Quantity Surveyor roles as Professional for
+    // capacity defaults while leaving the displayed grade untouched.
+    if (lower === 'cost manager' || lower === 'quantity surveyor'){
       return 'Professional';
     }
     return clean;
@@ -771,7 +773,8 @@
       p.Surname = tidyLabel(getVal(keyMap,row,'Surname'));
       p.FirstForename = tidyLabel(getVal(keyMap,row,'FirstForename'));
       p.CostCentre = tidyLabel(getVal(keyMap,row,'CostCentre'));
-      p.Grade = normalizeGrade(getVal(keyMap,row,'Grade'));
+      const gradeRaw = tidyLabel(getVal(keyMap,row,'Grade'));
+      p.Grade = gradeRaw; // Preserve uploaded grade for display
       p.GradeLevel = tidyLabel(getVal(keyMap,row,'GradeLevel'));
       p.Discipline = tidyLabel(getVal(keyMap,row,'Discipline'));
       p.Office = tidyLabel(getVal(keyMap,row,'Office'));
@@ -788,7 +791,8 @@
       p.Capacity = toNum(getVal(keyMap,row,'Capacity'));
       // apply grade rules if capacity not set or zero
       if (!p.Capacity || p.Capacity <= 0){
-        p.Capacity = gradeDefaultCapacity(p.Grade, p.GradeLevel);
+        const gradeForCap = gradeForCapacity(p.Grade);
+        p.Capacity = gradeDefaultCapacity(gradeForCap, p.GradeLevel);
       }
       p.FullName = (p.FirstForename + ' ' + p.Surname).trim();
       p.fullNameKey = canonicalKey(p.FullName);
