@@ -382,43 +382,79 @@
       font-size: 12px;
     }
 
-    .org-tree-group-body {
-      padding-left: 2px;
+    .org-group {
+      border: 1px solid var(--border-soft);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: #0f1118;
+      margin-bottom: 8px;
     }
 
-    .org-group-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding-left: 6px;
-      border-left: 1px dashed #2b3140;
-    }
-
-    .org-node-row {
+    .org-group-header {
       display: flex;
       align-items: center;
+      gap: 10px;
       justify-content: space-between;
-      gap: 8px;
+      cursor: pointer;
     }
 
     .org-group-title {
-      font-size: 12px;
-      color: var(--text-soft);
+      font-size: 13px;
+      color: var(--text-main);
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      margin: 8px 0 4px;
+      font-weight: 700;
     }
 
-    .org-tree ul {
-      list-style: none;
-      margin: 0;
-      padding-left: 14px;
-      border-left: 1px dashed #2b3140;
+    .org-group-meta {
+      color: var(--text-soft);
+      font-size: 12px;
+      flex: 1;
+      padding-left: 8px;
     }
-    .org-tree li {
-      margin: 3px 0;
-      padding-left: 6px;
-      position: relative;
+
+    .org-group-tree-btn {
+      background: #161a24;
+      color: var(--text-main);
+      border: 1px solid var(--border-soft);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .org-group-tree-btn:hover { background: #1b1f2c; }
+
+    .org-tree-detail {
+      margin-top: 14px;
+      padding: 14px 12px;
+      border-radius: 18px;
+      border: 1px solid var(--border-soft);
+      background: var(--bg-card-soft);
+    }
+    .org-tree-detail.empty { color: var(--text-soft); }
+
+    .org-tree-title {
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+    }
+
+    .org-tree-grid {
+      margin-top: 12px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .org-tree-column { display: flex; flex-direction: column; gap: 8px; }
+
+    .org-node-card {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 12px;
+      border: 1px solid #262a35;
+      background: #111420;
     }
 
     .org-person {
@@ -547,6 +583,9 @@
           <div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>
         </div>
       </div>
+      <section id="org-tree-detail" class="org-tree-detail empty">
+        <div class="subtle">Click a group to view its hierarchy.</div>
+      </section>
     </div>
   </section>
 </div>
@@ -1035,6 +1074,8 @@
   const orgGroupBy = document.getElementById('orgGroupBy');
   const orgBuildBtn = document.getElementById('orgBuildBtn');
   const orgTreeRoot = document.getElementById('orgTreeRoot');
+  const orgTreeDetail = document.getElementById('org-tree-detail');
+  let selectedOrgGroup = null;
 
   function canonicalName(name){
     return (name || '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
@@ -1054,12 +1095,6 @@
     });
   }
 
-  function sortChildrenRecursive(node){
-    if (!node.children || !node.children.length) return;
-    sortNodes(node.children);
-    node.children.forEach(sortChildrenRecursive);
-  }
-
   function buildOrgTreeForGroup(groupPeople){
     const byName = new Map();
     groupPeople.forEach(p=>{
@@ -1068,7 +1103,7 @@
 
     const nodesByPerson = new Map();
     groupPeople.forEach(p=>{
-      nodesByPerson.set(p, { person: p, children: [] });
+      nodesByPerson.set(p, { person: p, children: [], depth: 0 });
     });
 
     const roots = [];
@@ -1085,16 +1120,42 @@
       }
     });
 
+    if (!roots.length){
+      roots.push(...nodesByPerson.values());
+    }
+
     sortNodes(roots);
     roots.forEach(sortChildrenRecursive);
+
+    function markDepth(node, depth){
+      node.depth = depth;
+      (node.children||[]).forEach(child=>markDepth(child, depth+1));
+    }
+    roots.forEach(r=>markDepth(r,0));
     return roots;
   }
 
-  function renderOrgNode(parentEl, node, depth){
-    const { person, children } = node;
-    const row = document.createElement('div');
-    row.className = 'org-node-row';
-    row.style.marginLeft = (depth * 24) + 'px';
+  function sortChildrenRecursive(node){
+    if (!node.children || !node.children.length) return;
+    sortNodes(node.children);
+    node.children.forEach(sortChildrenRecursive);
+  }
+
+  function groupNodesByDepth(roots){
+    const levels = new Map();
+    function visit(node){
+      const depth = node.depth || 0;
+      if (!levels.has(depth)) levels.set(depth, []);
+      levels.get(depth).push(node);
+      (node.children||[]).forEach(visit);
+    }
+    roots.forEach(visit);
+    return levels;
+  }
+
+  function createPersonNodeCard(person){
+    const card = document.createElement('div');
+    card.className = 'org-node-card';
 
     const main = document.createElement('div');
     main.className = 'org-person';
@@ -1103,41 +1164,54 @@
       ${person.Grade ? `<span class="org-person-role">${person.Grade}</span>` : ''}
       ${person.Discipline ? `<span class="org-person-tag">${person.Discipline}</span>` : ''}
       ${person.Office ? `<span class="org-person-tag">${person.Office}</span>` : ''}
-      ${person.Region ? `<span class="org-person-tag">${person.Region}</span>` : ''}
     `;
-    row.appendChild(main);
+    card.appendChild(main);
 
     if (person.IsManager || person.currentReports>0){
       const capSpan = document.createElement('span');
       capSpan.innerHTML = capacityChip(person,{showIfNonManager:true});
-      row.appendChild(capSpan);
+      card.appendChild(capSpan);
     }
 
-    parentEl.appendChild(row);
-    let count = 1;
-
-    if (children && children.length){
-      children.forEach(child => {
-        count += renderOrgNode(parentEl, child, depth + 1);
-      });
-    }
-    return count;
+    return card;
   }
 
-  function renderOrgGroupHierarchical(container, groupLabel, groupPeople){
-    const roots = buildOrgTreeForGroup(groupPeople);
-    const bodyEl = document.createElement('div');
-    bodyEl.className = 'org-tree-group-body';
-    container.appendChild(bodyEl);
+  function renderRegionTreeDetail(groupLabel, groupPeople){
+    if (!groupPeople || !groupPeople.length){
+      orgTreeDetail.classList.add('empty');
+      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
+      return;
+    }
 
-    const list = document.createElement('div');
-    list.className = 'org-group-list';
-    bodyEl.appendChild(list);
+    const roots = buildOrgTreeForGroup(groupPeople);
+    const levels = groupNodesByDepth(roots);
+    const maxDepth = Math.max(...Array.from(levels.keys()));
+
+    orgTreeDetail.classList.remove('empty');
+    orgTreeDetail.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.className = 'org-tree-title';
+    title.textContent = `${groupLabel.toUpperCase()} – Hierarchy`;
+    orgTreeDetail.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'org-tree-grid';
+    grid.style.gridTemplateColumns = `repeat(${maxDepth + 1}, minmax(0, 1fr))`;
+    orgTreeDetail.appendChild(grid);
 
     let renderedCount = 0;
-    roots.forEach(node => {
-      renderedCount += renderOrgNode(list, node, 0);
-    });
+    for (let depth = 0; depth <= maxDepth; depth++){
+      const col = document.createElement('div');
+      col.className = 'org-tree-column';
+      const nodes = levels.get(depth) || [];
+      sortNodes(nodes);
+      nodes.forEach(node=>{
+        renderedCount++;
+        col.appendChild(createPersonNodeCard(node.person));
+      });
+      grid.appendChild(col);
+    }
 
     console.log('Organigram DOM rows for', groupLabel, ':', renderedCount, 'expected:', groupPeople.length);
   }
@@ -1146,6 +1220,8 @@
     const people = state.people || [];
     if (!people.length){
       orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab first.</div>';
+      orgTreeDetail.classList.add('empty');
+      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
       return;
     }
     const mode = orgGroupBy.value;
@@ -1170,6 +1246,9 @@
       console.warn('Organigram grouping mismatch', { totalInGroups, peopleLength: people.length });
     }
 
+    selectedOrgGroup = null;
+    orgTreeDetail.classList.add('empty');
+    orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
     const keys = Object.keys(groups).sort((a,b)=> a.localeCompare(b));
     orgTreeRoot.innerHTML = '';
 
@@ -1180,12 +1259,36 @@
       const groupEl = document.createElement('div');
       groupEl.className = 'org-group';
 
-      const titleEl = document.createElement('div');
+      const header = document.createElement('div');
+      header.className = 'org-group-header';
+      header.dataset.groupKey = key;
+
+      const titleEl = document.createElement('span');
       titleEl.className = 'org-group-title';
       titleEl.textContent = group.label;
-      groupEl.appendChild(titleEl);
+      header.appendChild(titleEl);
 
-      renderOrgGroupHierarchical(groupEl, key, group.people);
+      const managerList = group.people.filter(p=>p.IsManager || p.currentReports>0);
+      const meta = document.createElement('span');
+      meta.className = 'org-group-meta';
+      meta.textContent = `${group.people.length} people${managerList.length ? ` • ${managerList.length} managers` : ''}`;
+      header.appendChild(meta);
+
+      const btn = document.createElement('button');
+      btn.className = 'org-group-tree-btn';
+      btn.textContent = 'View tree';
+      header.appendChild(btn);
+
+      const handleSelect = ()=>{
+        selectedOrgGroup = key;
+        document.querySelectorAll('.org-group-header').forEach(h=>h.classList.toggle('active', h.dataset.groupKey===key));
+        renderRegionTreeDetail(group.label, group.people);
+      };
+
+      header.addEventListener('click', handleSelect);
+      btn.addEventListener('click', e=>{ e.stopPropagation(); handleSelect(); });
+
+      groupEl.appendChild(header);
       orgTreeRoot.appendChild(groupEl);
     });
 
@@ -1268,6 +1371,11 @@
     if (!hasData){
       fmResults.innerHTML = '<div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>';
       orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>';
+      orgTreeDetail.classList.add('empty');
+      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
+    } else if (!selectedOrgGroup){
+      orgTreeDetail.classList.add('empty');
+      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
     }
   }
 
