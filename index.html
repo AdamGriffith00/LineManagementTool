@@ -1054,6 +1054,42 @@
     });
   }
 
+  function sortChildrenRecursive(node){
+    if (!node.children || !node.children.length) return;
+    sortNodes(node.children);
+    node.children.forEach(sortChildrenRecursive);
+  }
+
+  function buildOrgTreeForGroup(groupPeople){
+    const byName = new Map();
+    groupPeople.forEach(p=>{
+      byName.set(canonicalName(p.Name), p);
+    });
+
+    const nodesByPerson = new Map();
+    groupPeople.forEach(p=>{
+      nodesByPerson.set(p, { person: p, children: [] });
+    });
+
+    const roots = [];
+    const groupSet = new Set(groupPeople);
+    groupPeople.forEach(p=>{
+      const node = nodesByPerson.get(p);
+      const mgrName = canonicalName(p.Manager);
+      const managerPerson = byName.get(mgrName);
+      if (managerPerson && managerPerson !== p && groupSet.has(managerPerson)){
+        const mgrNode = nodesByPerson.get(managerPerson);
+        mgrNode.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+
+    sortNodes(roots);
+    roots.forEach(sortChildrenRecursive);
+    return roots;
+  }
+
   function renderOrgNode(parentEl, node, depth){
     const { person, children } = node;
     const row = document.createElement('div');
@@ -1081,7 +1117,6 @@
     let count = 1;
 
     if (children && children.length){
-      sortNodes(children);
       children.forEach(child => {
         count += renderOrgNode(parentEl, child, depth + 1);
       });
@@ -1089,7 +1124,8 @@
     return count;
   }
 
-  function renderOrgGroupHierarchical(container, groupLabel, roots, groupPeople){
+  function renderOrgGroupHierarchical(container, groupLabel, groupPeople){
+    const roots = buildOrgTreeForGroup(groupPeople);
     const bodyEl = document.createElement('div');
     bodyEl.className = 'org-tree-group-body';
     container.appendChild(bodyEl);
@@ -1099,7 +1135,6 @@
     bodyEl.appendChild(list);
 
     let renderedCount = 0;
-    sortNodes(roots);
     roots.forEach(node => {
       renderedCount += renderOrgNode(list, node, 0);
     });
@@ -1142,30 +1177,6 @@
       const group = groups[key];
       console.log('Organigram group', key, 'members:', group.people.length);
 
-      const byName = new Map();
-      group.people.forEach(p=>{
-        byName.set(canonicalName(p.Name), p);
-      });
-
-      const nodesByPerson = new Map();
-      group.people.forEach(p=>{
-        nodesByPerson.set(p, { person: p, children: [] });
-      });
-
-      const roots = [];
-      const groupSet = new Set(group.people);
-      group.people.forEach(p=>{
-        const node = nodesByPerson.get(p);
-        const mgrName = canonicalName(p.Manager);
-        const managerPerson = byName.get(mgrName);
-        if (managerPerson && managerPerson !== p && groupSet.has(managerPerson)){
-          const mgrNode = nodesByPerson.get(managerPerson);
-          mgrNode.children.push(node);
-        } else {
-          roots.push(node);
-        }
-      });
-
       const groupEl = document.createElement('div');
       groupEl.className = 'org-group';
 
@@ -1174,7 +1185,7 @@
       titleEl.textContent = group.label;
       groupEl.appendChild(titleEl);
 
-      renderOrgGroupHierarchical(groupEl, key, roots, group.people);
+      renderOrgGroupHierarchical(groupEl, key, group.people);
       orgTreeRoot.appendChild(groupEl);
     });
 
