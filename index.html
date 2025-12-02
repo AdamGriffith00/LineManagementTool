@@ -564,8 +564,17 @@
 
   // --- Utility ------------------------------------------------------------
   function norm(s){ return (s||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,''); }
-  function canonicalName(name){
-    return (name||'').toString().trim().replace(/\s+/g,' ').toLowerCase();
+  function swapCommaName(name){
+    if (!name) return '';
+    const parts = name.split(',').map(p=>p.trim()).filter(Boolean);
+    if (parts.length === 2){
+      return `${parts[1]} ${parts[0]}`;
+    }
+    return name.replace(/\s+/g,' ');
+  }
+  function canonicalKey(value){
+    const base = swapCommaName((value||'').toString().normalize('NFKD').replace(/[\u0300-\u036f]/g,''));
+    return base.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   }
 
   function tidyLabel(value){
@@ -773,8 +782,8 @@
         p.Capacity = gradeDefaultCapacity(p.Grade, p.GradeLevel);
       }
       p.FullName = (p.FirstForename + ' ' + p.Surname).trim();
-      p.fullNameKey = canonicalName(p.FullName);
-      p.managerKey = canonicalName(p.Manager);
+      p.fullNameKey = canonicalKey(p.FullName);
+      p.managerKey = canonicalKey(p.Manager);
       return p;
     });
 
@@ -989,7 +998,7 @@
     people.forEach(p=>{ if (p.fullNameKey) nameToId.set(p.fullNameKey, p.id); });
     const roots = [];
     people.forEach(p=>{
-      const mgrName = canonicalName(p.Manager);
+      const mgrName = canonicalKey(p.Manager);
       const mgrId = mgrName ? nameToId.get(mgrName) : null;
       if (mgrId && byId.has(mgrId) && mgrId !== p.id){
         byId.get(mgrId).children.push(p);
@@ -1032,7 +1041,7 @@
     const mode = orgGroupBy.value;
     const groups = new Map();
     const addToGroup = (label, person)=>{
-      const key = label.toLowerCase();
+      const key = canonicalKey(label) || label.toLowerCase();
       if (!groups.has(key)) groups.set(key, {label, people: []});
       groups.get(key).people.push(person);
     };
