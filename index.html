@@ -382,6 +382,10 @@
       font-size: 12px;
     }
 
+    .org-tree-group-body {
+      padding-left: 2px;
+    }
+
     .org-group-title {
       font-size: 12px;
       color: var(--text-soft);
@@ -1039,24 +1043,40 @@
     return roots;
   }
 
-  function renderTreeList(nodes){
-    if (!nodes.length) return '<div class="subtle">No staff in this group.</div>';
-    const rec = (list)=>{
-      if (!list.length) return '';
-      return '<ul>' + list.map(node=>{
-        const p = node.person || {};
-        const showCap = p.IsManager || p.currentReports>0;
-        return `<li>
-          <div class="org-person">
-            <span class="org-person-name">${p.FullName || ''}</span>
-            ${p.Grade ? `<span class="org-person-role">${p.Grade}</span>` : ''}
-            ${showCap ? capacityChip(p,{showIfNonManager:true}) : ''}
-          </div>
-          ${rec(node.children || [])}
-        </li>`;
-      }).join('') + '</ul>';
-    };
-    return `<div>${rec(nodes)}</div>`;
+  function renderOrgNode(listEl, node){
+    const p = node.person || {};
+    const li = document.createElement('li');
+    const personWrap = document.createElement('div');
+    personWrap.className = 'org-person';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'org-person-name';
+    nameSpan.textContent = p.FullName || '';
+    personWrap.appendChild(nameSpan);
+
+    if (p.Grade){
+      const gradeSpan = document.createElement('span');
+      gradeSpan.className = 'org-person-role';
+      gradeSpan.textContent = p.Grade;
+      personWrap.appendChild(gradeSpan);
+    }
+
+    const showCap = p.IsManager || p.currentReports>0;
+    if (showCap){
+      const capSpan = document.createElement('span');
+      capSpan.innerHTML = capacityChip(p,{showIfNonManager:true});
+      personWrap.appendChild(capSpan);
+    }
+
+    li.appendChild(personWrap);
+
+    if (node.children && node.children.length){
+      const childUl = document.createElement('ul');
+      node.children.forEach(child=> renderOrgNode(childUl, child));
+      li.appendChild(childUl);
+    }
+
+    listEl.appendChild(li);
   }
 
   function renderOrgTree(){
@@ -1088,17 +1108,52 @@
     }
 
     const keys = Object.keys(groups).sort((a,b)=> a.localeCompare(b));
-    let html='';
+    orgTreeRoot.innerHTML = '';
+
+    const renderGroup = (groupKey, group)=>{
+      const groupEl = document.createElement('div');
+      groupEl.className = 'org-group';
+
+      const titleEl = document.createElement('div');
+      titleEl.className = 'org-group-title';
+      titleEl.textContent = group.label;
+      groupEl.appendChild(titleEl);
+
+      const bodyEl = document.createElement('div');
+      bodyEl.className = 'org-tree-group-body';
+      groupEl.appendChild(bodyEl);
+
+      const roots = buildGroupHierarchy(group.people);
+
+      if (!roots.length){
+        const empty = document.createElement('div');
+        empty.className = 'subtle';
+        empty.textContent = 'No staff in this group.';
+        bodyEl.appendChild(empty);
+      } else {
+        const ul = document.createElement('ul');
+        bodyEl.appendChild(ul);
+        roots.forEach(node=>{
+          renderOrgNode(ul, node);
+        });
+      }
+
+      const totalExpected = group.people.length;
+      const actualRows = bodyEl.querySelectorAll('.org-person').length;
+      console.log('Organigram DOM rows for', groupKey, ':', actualRows, 'expected:', totalExpected);
+
+      orgTreeRoot.appendChild(groupEl);
+    };
+
     keys.forEach(key=>{
       const group = groups[key];
       console.log('Organigram group', key, 'members:', group.people.length);
-      const roots = buildGroupHierarchy(group.people);
-      html += `<div class="org-group">
-        <div class="org-group-title">${group.label}</div>
-        ${renderTreeList(roots)}
-      </div>`;
+      renderGroup(key, group);
     });
-    orgTreeRoot.innerHTML = html || '<div class="subtle">Nothing to display.</div>';
+
+    if (!keys.length){
+      orgTreeRoot.innerHTML = '<div class="subtle">Nothing to display.</div>';
+    }
   }
 
   orgBuildBtn.addEventListener('click', renderOrgTree);
