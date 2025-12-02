@@ -1004,28 +1004,38 @@
   const orgBuildBtn = document.getElementById('orgBuildBtn');
   const orgTreeRoot = document.getElementById('orgTreeRoot');
 
-  function buildHierarchy(people){
-    // Clone into lightweight nodes so we do not mutate the shared people array
-    const nodes = people.map(p=> ({...p, children: []}));
-    const nameToNode = new Map();
-    nodes.forEach(n=>{ if (n.fullNameKey) nameToNode.set(n.fullNameKey, n); });
+  const canonicalName = (name)=> (name||'').toString().trim().replace(/\s+/g,' ').toLowerCase();
 
+  function buildGroupHierarchy(groupPeople){
+    const byName = new Map();
+    groupPeople.forEach(p=>{
+      const key = canonicalName(p.FullName || p.Name);
+      if (key) byName.set(key, p);
+    });
+
+    const nodesByPerson = new Map();
+    groupPeople.forEach(p=> nodesByPerson.set(p, { person: p, children: [] }));
+    const groupSet = new Set(groupPeople);
     const roots = [];
-    nodes.forEach(n=>{
-      const mgrKey = n.managerKey || canonicalKey(n.Manager);
-      const mgrNode = mgrKey ? nameToNode.get(mgrKey) : null;
-      if (mgrNode && mgrNode !== n){
-        mgrNode.children.push(n);
+
+    groupPeople.forEach(p=>{
+      const node = nodesByPerson.get(p);
+      const mgrName = canonicalName(p.Manager);
+      const managerPerson = byName.get(mgrName);
+
+      if (managerPerson && managerPerson !== p && groupSet.has(managerPerson)){
+        const mgrNode = nodesByPerson.get(managerPerson);
+        mgrNode.children.push(node);
       } else {
-        roots.push(n);
+        roots.push(node);
       }
     });
 
-    const sortChildren = (list)=>{
-      list.sort((a,b)=>a.FullName.localeCompare(b.FullName));
-      list.forEach(child=> sortChildren(child.children));
+    const sortNodes = (list)=>{
+      list.sort((a,b)=> (a.person.FullName || '').localeCompare(b.person.FullName || ''));
+      list.forEach(child=> sortNodes(child.children));
     };
-    sortChildren(roots);
+    sortNodes(roots);
     return roots;
   }
 
@@ -1033,14 +1043,16 @@
     if (!nodes.length) return '<div class="subtle">No staff in this group.</div>';
     const rec = (list)=>{
       if (!list.length) return '';
-      return '<ul>' + list.map(p=>{
+      return '<ul>' + list.map(node=>{
+        const p = node.person || {};
+        const showCap = p.IsManager || p.currentReports>0;
         return `<li>
           <div class="org-person">
             <span class="org-person-name">${p.FullName || ''}</span>
             ${p.Grade ? `<span class="org-person-role">${p.Grade}</span>` : ''}
-            ${p.IsManager || p.currentReports>0 ? capacityChip(p,{showIfNonManager:true}) : ''}
+            ${showCap ? capacityChip(p,{showIfNonManager:true}) : ''}
           </div>
-          ${rec(p.children || [])}
+          ${rec(node.children || [])}
         </li>`;
       }).join('') + '</ul>';
     };
@@ -1054,24 +1066,33 @@
       return;
     }
     const mode = orgGroupBy.value;
-    const groups = new Map();
-    const addToGroup = (label, person)=>{
-      const key = canonicalKey(label) || label.toLowerCase();
-      if (!groups.has(key)) groups.set(key, {label, people: []});
-      groups.get(key).people.push(person);
+    const groups = {};
+
+    const computeGroupKey = (person)=>{
+      const regionLabel = person.Region || 'Unknown';
+      const discLabel = person.Discipline || 'Unknown';
+      if (mode === 'region') return regionLabel;
+      if (mode === 'discipline') return discLabel;
+      return `${regionLabel} • ${discLabel}`;
     };
 
     people.forEach(p=>{
-      const regionLabel = tidyLabel(p.Region) || 'Unknown region';
-      const discLabel = tidyLabel(p.Discipline) || 'Unknown discipline';
-      if (mode==='region') addToGroup(regionLabel, p);
-      else if (mode==='discipline') addToGroup(discLabel, p);
-      else addToGroup(`${regionLabel} • ${discLabel}`, p);
+      const key = computeGroupKey(p);
+      if (!groups[key]) groups[key] = { label: key, people: [] };
+      groups[key].people.push(p);
     });
+
+    const totalInGroups = Object.values(groups).reduce((sum,g)=> sum + g.people.length, 0);
+    if (totalInGroups !== people.length){
+      console.warn('Organigram grouping mismatch', { totalInGroups, peopleLength: people.length });
+    }
+
+    const keys = Object.keys(groups).sort((a,b)=> a.localeCompare(b));
     let html='';
-    Array.from(groups.keys()).sort((a,b)=>a.localeCompare(b)).forEach(key=>{
-      const group = groups.get(key);
-      const roots = buildHierarchy(group.people);
+    keys.forEach(key=>{
+      const group = groups[key];
+      console.log('Organigram group', key, 'members:', group.people.length);
+      const roots = buildGroupHierarchy(group.people);
       html += `<div class="org-group">
         <div class="org-group-title">${group.label}</div>
         ${renderTreeList(roots)}
