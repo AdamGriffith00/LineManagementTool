@@ -581,6 +581,15 @@
     return (value||'').toString().replace(/\s+/g,' ').trim();
   }
 
+  function normalizeGrade(value){
+    const clean = tidyLabel(value);
+    const lower = clean.toLowerCase();
+    if (lower.includes('cost manager') || lower.includes('quantity surveyor')){
+      return 'Professional';
+    }
+    return clean;
+  }
+
   function buildKeyMap(firstRow){
     const keys = Object.keys(firstRow || {});
     const keysNorm = keys.map(k=>norm(k));
@@ -762,7 +771,7 @@
       p.Surname = tidyLabel(getVal(keyMap,row,'Surname'));
       p.FirstForename = tidyLabel(getVal(keyMap,row,'FirstForename'));
       p.CostCentre = tidyLabel(getVal(keyMap,row,'CostCentre'));
-      p.Grade = tidyLabel(getVal(keyMap,row,'Grade'));
+      p.Grade = normalizeGrade(getVal(keyMap,row,'Grade'));
       p.GradeLevel = tidyLabel(getVal(keyMap,row,'GradeLevel'));
       p.Discipline = tidyLabel(getVal(keyMap,row,'Discipline'));
       p.Office = tidyLabel(getVal(keyMap,row,'Office'));
@@ -899,7 +908,7 @@
           <td>${p.Area || ''}</td>
           <td>${p.DirectorName || ''}</td>
           <td>${p.Manager || ''}</td>
-          <td>${p.IsManager || p.currentReports>0 ? 'Y' : ''}</td>
+          <td>${p.IsManager || p.currentReports>0 ? 'Y' : 'N'}</td>
           <td>${capacityChip(p)}</td>
           <td>${p.currentReports}</td>
         </tr>
