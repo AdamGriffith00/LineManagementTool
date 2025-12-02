@@ -386,6 +386,21 @@
       padding-left: 2px;
     }
 
+    .org-group-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-left: 6px;
+      border-left: 1px dashed #2b3140;
+    }
+
+    .org-node-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
     .org-group-title {
       font-size: 12px;
       color: var(--text-soft);
@@ -1008,75 +1023,41 @@
   const orgBuildBtn = document.getElementById('orgBuildBtn');
   const orgTreeRoot = document.getElementById('orgTreeRoot');
 
-  const canonicalName = (name)=> (name||'').toString().trim().replace(/\s+/g,' ').toLowerCase();
+  function renderOrgGroupFlat(container, groupLabel, groupPeople){
+    const bodyEl = document.createElement('div');
+    bodyEl.className = 'org-tree-group-body';
+    container.appendChild(bodyEl);
 
-  function buildGroupHierarchy(groupPeople){
-    const byName = new Map();
-    groupPeople.forEach(p=>{
-      const key = canonicalName(p.FullName || p.Name);
-      if (key) byName.set(key, p);
-    });
-
-    const nodesByPerson = new Map();
-    groupPeople.forEach(p=> nodesByPerson.set(p, { person: p, children: [] }));
-    const groupSet = new Set(groupPeople);
-    const roots = [];
+    const list = document.createElement('div');
+    list.className = 'org-group-list';
+    bodyEl.appendChild(list);
 
     groupPeople.forEach(p=>{
-      const node = nodesByPerson.get(p);
-      const mgrName = canonicalName(p.Manager);
-      const managerPerson = byName.get(mgrName);
+      const row = document.createElement('div');
+      row.className = 'org-node-row';
 
-      if (managerPerson && managerPerson !== p && groupSet.has(managerPerson)){
-        const mgrNode = nodesByPerson.get(managerPerson);
-        mgrNode.children.push(node);
-      } else {
-        roots.push(node);
+      const main = document.createElement('div');
+      main.className = 'org-person';
+      main.innerHTML = `
+        <span class="org-person-name">${p.FullName || ''}</span>
+        ${p.Grade ? `<span class="org-person-role">${p.Grade}</span>` : ''}
+        ${p.Discipline ? `<span class="org-person-tag">${p.Discipline}</span>` : ''}
+        ${p.Office ? `<span class="org-person-tag">${p.Office}</span>` : ''}
+        ${p.Region ? `<span class="org-person-tag">${p.Region}</span>` : ''}
+      `;
+      row.appendChild(main);
+
+      if (p.IsManager){
+        const capSpan = document.createElement('span');
+        capSpan.innerHTML = capacityChip(p,{showIfNonManager:true});
+        row.appendChild(capSpan);
       }
+
+      list.appendChild(row);
     });
 
-    const sortNodes = (list)=>{
-      list.sort((a,b)=> (a.person.FullName || '').localeCompare(b.person.FullName || ''));
-      list.forEach(child=> sortNodes(child.children));
-    };
-    sortNodes(roots);
-    return roots;
-  }
-
-  function renderOrgNode(listEl, node){
-    const p = node.person || {};
-    const li = document.createElement('li');
-    const personWrap = document.createElement('div');
-    personWrap.className = 'org-person';
-
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'org-person-name';
-    nameSpan.textContent = p.FullName || '';
-    personWrap.appendChild(nameSpan);
-
-    if (p.Grade){
-      const gradeSpan = document.createElement('span');
-      gradeSpan.className = 'org-person-role';
-      gradeSpan.textContent = p.Grade;
-      personWrap.appendChild(gradeSpan);
-    }
-
-    const showCap = p.IsManager || p.currentReports>0;
-    if (showCap){
-      const capSpan = document.createElement('span');
-      capSpan.innerHTML = capacityChip(p,{showIfNonManager:true});
-      personWrap.appendChild(capSpan);
-    }
-
-    li.appendChild(personWrap);
-
-    if (node.children && node.children.length){
-      const childUl = document.createElement('ul');
-      node.children.forEach(child=> renderOrgNode(childUl, child));
-      li.appendChild(childUl);
-    }
-
-    listEl.appendChild(li);
+    const renderedRows = list.querySelectorAll('.org-node-row').length;
+    console.log('Organigram DOM rows for', groupLabel, ':', renderedRows, 'expected:', groupPeople.length);
   }
 
   function renderOrgTree(){
@@ -1119,29 +1100,7 @@
       titleEl.textContent = group.label;
       groupEl.appendChild(titleEl);
 
-      const bodyEl = document.createElement('div');
-      bodyEl.className = 'org-tree-group-body';
-      groupEl.appendChild(bodyEl);
-
-      const roots = buildGroupHierarchy(group.people);
-
-      if (!roots.length){
-        const empty = document.createElement('div');
-        empty.className = 'subtle';
-        empty.textContent = 'No staff in this group.';
-        bodyEl.appendChild(empty);
-      } else {
-        const ul = document.createElement('ul');
-        bodyEl.appendChild(ul);
-        roots.forEach(node=>{
-          renderOrgNode(ul, node);
-        });
-      }
-
-      const totalExpected = group.people.length;
-      const actualRows = bodyEl.querySelectorAll('.org-person').length;
-      console.log('Organigram DOM rows for', groupKey, ':', actualRows, 'expected:', totalExpected);
-
+      renderOrgGroupFlat(groupEl, groupKey, group.people);
       orgTreeRoot.appendChild(groupEl);
     };
 
