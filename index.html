@@ -1005,20 +1005,22 @@
   const orgTreeRoot = document.getElementById('orgTreeRoot');
 
   function buildHierarchy(people){
-    const byId = new Map();
-    people.forEach(p=>{ p.children = []; byId.set(p.id, p); });
-    const nameToId = new Map();
-    people.forEach(p=>{ if (p.fullNameKey) nameToId.set(p.fullNameKey, p.id); });
+    // Clone into lightweight nodes so we do not mutate the shared people array
+    const nodes = people.map(p=> ({...p, children: []}));
+    const nameToNode = new Map();
+    nodes.forEach(n=>{ if (n.fullNameKey) nameToNode.set(n.fullNameKey, n); });
+
     const roots = [];
-    people.forEach(p=>{
-      const mgrName = canonicalKey(p.Manager);
-      const mgrId = mgrName ? nameToId.get(mgrName) : null;
-      if (mgrId && byId.has(mgrId) && mgrId !== p.id){
-        byId.get(mgrId).children.push(p);
+    nodes.forEach(n=>{
+      const mgrKey = n.managerKey || canonicalKey(n.Manager);
+      const mgrNode = mgrKey ? nameToNode.get(mgrKey) : null;
+      if (mgrNode && mgrNode !== n){
+        mgrNode.children.push(n);
       } else {
-        roots.push(p);
+        roots.push(n);
       }
     });
+
     const sortChildren = (list)=>{
       list.sort((a,b)=>a.FullName.localeCompare(b.FullName));
       list.forEach(child=> sortChildren(child.children));
