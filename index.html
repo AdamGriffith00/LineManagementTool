@@ -1121,7 +1121,8 @@
   function buildOrgTreeForGroup(groupPeople){
     const byName = new Map();
     groupPeople.forEach(p=>{
-      byName.set(canonicalName(p.FullName), p);
+      const key = canonicalName(p.Name || p.FullName);
+      byName.set(key, p);
     });
 
     const nodesByPerson = new Map();
@@ -1147,14 +1148,15 @@
       roots.push(...nodesByPerson.values());
     }
 
-    sortNodes(roots);
-    roots.forEach(sortChildrenRecursive);
-
     function markDepth(node, depth){
       node.depth = depth;
       (node.children||[]).forEach(child=>markDepth(child, depth+1));
     }
     roots.forEach(r=>markDepth(r,0));
+
+    sortNodes(roots);
+    roots.forEach(sortChildrenRecursive);
+
     return roots;
   }
 
@@ -1233,14 +1235,12 @@
     grid.style.gridTemplateColumns = `repeat(${maxDepth + 1}, minmax(0, 1fr))`;
     orgTreeDetail.appendChild(grid);
 
-    let renderedCount = 0;
     for (let depth = 0; depth <= maxDepth; depth++){
       const col = document.createElement('div');
       col.className = 'org-tree-column';
       const nodes = levels.get(depth) || [];
       sortLevel(nodes);
       nodes.forEach(node=>{
-        renderedCount++;
         const card = createPersonNodeCard(node.person);
         card.classList.add('org-tree-node');
         col.appendChild(card);
@@ -1248,7 +1248,8 @@
       grid.appendChild(col);
     }
 
-    console.log('Organigram DOM rows for', groupLabel, ':', renderedCount, 'expected:', groupPeople.length);
+    const cards = orgTreeDetail.querySelectorAll('.org-tree-node');
+    console.log('Organigram DOM rows for', groupLabel, ':', cards.length, 'expected:', groupPeople.length);
   }
 
   function renderOrgTree(){
