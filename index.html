@@ -1334,11 +1334,12 @@
     const g = gradeName.toLowerCase();
 
     // Each inner array = labels that share the same depth.
+    // IMPORTANT: specific director titles come BEFORE plain "director".
     const levels = [
       // 0 – Senior Director
       ['senior director'],
-      // 1 – Director (plain)
-      ['director'],
+      // 1 – Director (plain, but only when not project/associate)
+      [' director '], // with spaces to avoid matching "project director" etc.
       // 2 – Project Director
       ['project director'],
       // 3 – Associate Director
@@ -1357,10 +1358,18 @@
       ['trainee cost manager', 'trainee quantity surveyor'],
     ];
 
-    for (let depth = 0; depth < levels.length; depth++) {
+    // Normalise spacing so the " director " test still works
+    const normalised = ` ${g.replace(/\s+/g, ' ').trim()} `;
+
+    // Check more specific director titles before the generic director bucket
+    const order = [0, 2, 3, 1, 4, 5, 6, 7, 8, 9];
+
+    for (let oi = 0; oi < order.length; oi++) {
+      const depth = order[oi];
       const labels = levels[depth];
       for (let i = 0; i < labels.length; i++) {
-        if (g.includes(labels[i])) {
+        // use normalised string for matching
+        if (normalised.includes(labels[i])) {
           return depth;
         }
       }
