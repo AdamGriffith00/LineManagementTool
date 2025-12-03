@@ -1375,16 +1375,18 @@
 
         const parentCenterX = parent.x + parent.boxWidth / 2;
         const parentBottomY = parent.y + parent.boxHeight;
-        const childCenterX = node.x + node.boxWidth / 2;
         const childTopY = node.y;
 
-        slide.addLine({
-          x: parentCenterX,
-          y: parentBottomY,
-          x2: childCenterX,
-          y2: childTopY,
-          line: { width: 0.75, color: '808080' }
-        });
+        const lineHeight = childTopY - parentBottomY;
+        if (lineHeight > 0) {
+          slide.addShape('line', {
+            x: parentCenterX,
+            y: parentBottomY,
+            w: 0,
+            h: lineHeight,
+            line: { width: 0.75, color: '808080' }
+          });
+        }
       });
 
       console.log('Region PPT tree', regionLabel, 'nodes:', nodes.length, 'expected:', peopleInRegion.length);
