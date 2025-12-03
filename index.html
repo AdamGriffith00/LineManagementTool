@@ -524,6 +524,12 @@
               <select id="fmRegion"></select>
             </div>
             <div class="field">
+              <div class="field-label">Office</div>
+              <select id="filter-office">
+                <option value="Any">Any office</option>
+              </select>
+            </div>
+            <div class="field">
               <div class="field-label">Grade (manager)</div>
               <select id="fmGrade"></select>
             </div>
@@ -547,6 +553,12 @@
             <div class="field-label">Region</div>
             <select id="capacity-region">
               <option value="Any">Any region</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-label">Office</div>
+            <select id="capacity-office">
+              <option value="Any">Any office</option>
             </select>
           </div>
           <div class="field">
@@ -712,6 +724,27 @@
     const cap = Number(person.Capacity || 0);
     const used = Number(person.currentReports || 0);
     return cap - used; // > 0 free, < 0 over, 0 at
+  }
+
+  function getOfficesForRegion(region) {
+    const offices = new Set();
+    (state.people || []).forEach(p => {
+      if (!p.Office) return;
+      if (region === 'Any' || (p.Region || '') === region) {
+        offices.add(p.Office);
+      }
+    });
+    return Array.from(offices).sort();
+  }
+
+  function populateOfficeSelect(selectEl, region) {
+    if (!selectEl) return;
+    const offices = getOfficesForRegion(region);
+    let html = '<option value="Any">Any office</option>';
+    offices.forEach(office => {
+      html += `<option value="${office}">${office}</option>`;
+    });
+    selectEl.innerHTML = html;
   }
 
   function capacityMeta(p){
@@ -1013,6 +1046,7 @@
 
   // --- Find a manager ----------------------------------------------------
   const fmRegion = document.getElementById('fmRegion');
+  const filterOfficeSelect = document.getElementById('filter-office');
   const fmGrade = document.getElementById('fmGrade');
   const fmFreeCap = document.getElementById('fmFreeCap');
   const fmSearchBtn = document.getElementById('fmSearchBtn');
@@ -1027,6 +1061,7 @@
   function fillFilterOptions(){
     const people = state.people || [];
     fillSelect(fmRegion, uniq(people.map(p=>p.Region)));
+    populateOfficeSelect(filterOfficeSelect, (fmRegion && fmRegion.value) || 'Any');
     fillSelect(fmGrade, uniq(people.map(p=>p.Grade)));
     const hasData = people.length>0;
     fmSearchBtn.disabled = !hasData;
@@ -1056,15 +1091,25 @@
     }).join('');
   }
 
+  if (fmRegion){
+    fmRegion.addEventListener('change', ()=>{
+      const region = fmRegion.value || 'Any';
+      populateOfficeSelect(filterOfficeSelect, region);
+      if (filterOfficeSelect) filterOfficeSelect.value = 'Any';
+    });
+  }
+
   fmSearchBtn.addEventListener('click', ()=>{
     const people = state.people || [];
     const reg = fmRegion.value;
+    const office = filterOfficeSelect ? filterOfficeSelect.value : 'Any';
     const grade = fmGrade.value;
     const minFree = parseInt(fmFreeCap.value || '0', 10);
     const candidates = people.filter(p=>{
       const isManager = p.IsManager || p.currentReports>0;
       if (!isManager) return false;
       if (reg && p.Region !== reg) return false;
+      if (office && office !== 'Any' && (p.Office || '') !== office) return false;
       if (grade && p.Grade !== grade) return false;
       if ((p.freeSlots || 0) < minFree) return false;
       return true;
@@ -1078,6 +1123,8 @@
 
   fmClearBtn.addEventListener('click', ()=>{
     fmRegion.value = '';
+    populateOfficeSelect(filterOfficeSelect, 'Any');
+    if (filterOfficeSelect) filterOfficeSelect.value = 'Any';
     fmGrade.value = '';
     fmFreeCap.value = 1;
     fmResults.innerHTML = '<div class="subtle">Cleared. Set filters and click <strong>Suggest</strong>.</div>';
@@ -1085,6 +1132,7 @@
 
   // --- Line managers by region -------------------------------------------
   const capacityRegionSelect = document.getElementById('capacity-region');
+  const capacityOfficeSelect = document.getElementById('capacity-office');
   const capacityStatusSelect = document.getElementById('capacity-status');
   const capacityResults = document.getElementById('capacity-results');
   const capacitySearchBtn = document.getElementById('capacity-search');
@@ -1108,13 +1156,15 @@
 
     const regionFilter = capacityRegionSelect ? capacityRegionSelect.value : 'Any';
     const statusFilter = capacityStatusSelect ? capacityStatusSelect.value : 'any';
+    const officeFilter = capacityOfficeSelect ? capacityOfficeSelect.value : 'Any';
 
     const managers = (state.people || []).filter(p => p.IsManager);
 
     const filtered = managers.filter(p => {
       const regionOk = regionFilter === 'Any' || (p.Region || '') === regionFilter;
+      const officeOk = officeFilter === 'Any' || (p.Office || '') === officeFilter;
       const statusOk = statusFilter === 'any' || (p.capStatus || '').toLowerCase() === statusFilter;
-      return regionOk && statusOk;
+      return regionOk && officeOk && statusOk;
     });
 
     filtered.sort((a, b) => {
@@ -1171,8 +1221,18 @@
   if (capacityClearBtn){
     capacityClearBtn.addEventListener('click', ()=>{
       if (capacityRegionSelect) capacityRegionSelect.value = 'Any';
+      populateOfficeSelect(capacityOfficeSelect, 'Any');
+      if (capacityOfficeSelect) capacityOfficeSelect.value = 'Any';
       if (capacityStatusSelect) capacityStatusSelect.value = 'any';
       if (capacityResults) capacityResults.innerHTML = '';
+    });
+  }
+
+  if (capacityRegionSelect){
+    capacityRegionSelect.addEventListener('change', ()=>{
+      const region = capacityRegionSelect.value || 'Any';
+      populateOfficeSelect(capacityOfficeSelect, region);
+      if (capacityOfficeSelect) capacityOfficeSelect.value = 'Any';
     });
   }
 
@@ -1592,6 +1652,8 @@
     renderPeopleTable();
     fillFilterOptions();
     populateCapacityRegions();
+    populateOfficeSelect(filterOfficeSelect, (fmRegion && fmRegion.value) || 'Any');
+    populateOfficeSelect(capacityOfficeSelect, (capacityRegionSelect && capacityRegionSelect.value) || 'Any');
     updateCapacityResults();
     const hasData = (state.people || []).length>0;
     orgBuildBtn.disabled = !hasData;
