@@ -1331,46 +1331,40 @@
 
   function gradeDepthIndex(gradeName) {
     if (!gradeName) return 99;
-    const g = gradeName.toLowerCase();
 
-    // Each inner array = labels that share the same depth.
-    // IMPORTANT: specific director titles come BEFORE plain "director".
-    const levels = [
-      // 0 – Senior Director
-      ['senior director'],
-      // 1 – Director (plain, but only when not project/associate)
-      [' director '], // with spaces to avoid matching "project director" etc.
-      // 2 – Project Director
-      ['project director'],
-      // 3 – Associate Director
-      ['associate director'],
-      // 4 – Executive CM / QS
-      ['executive cost manager', 'executive quantity surveyor'],
-      // 5 – Senior CM / QS
-      ['senior cost manager', 'senior quantity surveyor'],
-      // 6 – Cost Manager / Quantity Surveyor
-      ['cost manager', 'quantity surveyor'],
-      // 7 – Assistant CM / QS
-      ['assistant cost manager', 'assistant quantity surveyor'],
-      // 8 – Graduate CM / QS
-      ['graduate cost manager', 'graduate quantity surveyor'],
-      // 9 – Trainee CM / QS
-      ['trainee cost manager', 'trainee quantity surveyor'],
+    // Normalise case and spacing, and pad with spaces so
+    // patterns like " director " or " cost manager " don't
+    // accidentally match parts of other words.
+    const normalised = ` ${gradeName.toLowerCase().replace(/\s+/g, ' ').trim()} `;
+
+    // Rules are checked in this order. The FIRST match wins.
+    const rules = [
+      // Directors – specific first
+      { depth: 0, labels: ['senior director'] },
+      { depth: 2, labels: ['project director'] },
+      { depth: 3, labels: ['associate director'] },
+      { depth: 1, labels: [' director '] }, // plain "Director"
+
+      // Exec CM / QS
+      { depth: 4, labels: ['executive cost manager', 'executive quantity surveyor'] },
+
+      // Senior CM / QS
+      { depth: 5, labels: ['senior cost manager', 'senior quantity surveyor'] },
+
+      // Assistant / Graduate / Trainee CM / QS – specific before generic
+      { depth: 7, labels: ['assistant cost manager', 'assistant quantity surveyor'] },
+      { depth: 8, labels: ['graduate cost manager', 'graduate quantity surveyor'] },
+      { depth: 9, labels: ['trainee cost manager', 'trainee quantity surveyor'] },
+
+      // Generic Cost Manager / QS (checked last so it doesn't swallow the others)
+      { depth: 6, labels: [' cost manager ', ' quantity surveyor '] },
     ];
 
-    // Normalise spacing so the " director " test still works
-    const normalised = ` ${g.replace(/\s+/g, ' ').trim()} `;
-
-    // Check more specific director titles before the generic director bucket
-    const order = [0, 2, 3, 1, 4, 5, 6, 7, 8, 9];
-
-    for (let oi = 0; oi < order.length; oi++) {
-      const depth = order[oi];
-      const labels = levels[depth];
-      for (let i = 0; i < labels.length; i++) {
-        // use normalised string for matching
-        if (normalised.includes(labels[i])) {
-          return depth;
+    for (let i = 0; i < rules.length; i++) {
+      const rule = rules[i];
+      for (let j = 0; j < rule.labels.length; j++) {
+        if (normalised.includes(rule.labels[j])) {
+          return rule.depth;
         }
       }
     }
