@@ -494,6 +494,24 @@
       text-align: center;
     }
 
+    .org-person-card.org-highlight-manager {
+      box-shadow: 0 0 0 2px #ffd54f;
+    }
+
+    .org-person-card.org-highlight-report {
+      box-shadow: 0 0 0 2px #4caf50;
+    }
+
+    .org-person-card.org-dimmed {
+      opacity: 0.4;
+    }
+
+    .org-reports-summary {
+      margin-top: 0.5rem;
+      font-size: 0.75rem;
+      color: #ccc;
+    }
+
     .org-name { font-weight: 700; font-size: 13px; }
     .org-meta { color: var(--text-soft); font-size: 12px; margin-top: 2px; }
     .org-cap { margin-top: 6px; display: flex; justify-content: center; }
@@ -712,6 +730,7 @@
     rawObjects: [],
     people: [],
     managersByName: new Map(),
+    orgTrees: {},
   };
 
   const GRADE_ORDER = [
@@ -1373,9 +1392,75 @@
     return 99;
   }
 
-  function createOrgTreeCard(person) {
+  function clearOrgHighlights(treeRoot) {
+    if (!treeRoot) return;
+    treeRoot.querySelectorAll('.org-person-card').forEach(el => {
+      el.classList.remove('org-highlight-manager', 'org-highlight-report', 'org-dimmed');
+    });
+    treeRoot.querySelectorAll('.org-reports-summary').forEach(el => el.remove());
+  }
+
+  function renderOrgReportsSummary(managerCard, reports, reportNames) {
+    if (!managerCard || !managerCard.parentElement) return;
+    managerCard.parentElement.querySelectorAll('.org-reports-summary').forEach(el => el.remove());
+
+    const container = document.createElement('div');
+    container.className = 'org-reports-summary';
+
+    if (!reports || !reports.length) {
+      container.textContent = 'Direct reports: none';
+    } else {
+      container.textContent = `Direct reports (${reports.length}): ${reportNames.join(', ')}`;
+    }
+
+    managerCard.parentElement.appendChild(container);
+  }
+
+  function onOrgPersonClick(evt) {
+    const card = evt.currentTarget;
+    const personKey = card.dataset.personKey;
+    const groupKey = card.dataset.groupKey;
+    if (!personKey || !groupKey || !state.orgTrees || !state.orgTrees[groupKey]) return;
+
+    const { nodeByKey } = state.orgTrees[groupKey];
+    const node = nodeByKey.get(personKey);
+    if (!node) return;
+
+    const treeRoot = card.closest('.org-tree');
+    clearOrgHighlights(treeRoot);
+
+    card.classList.add('org-highlight-manager');
+
+    const reports = node.children || [];
+    const reportNames = [];
+    reports.forEach(child => {
+      const key = (child.person.Name || '').toLowerCase();
+      if (!key) return;
+      reportNames.push(child.person.Name);
+      const selector = `.org-person-card[data-group-key="${groupKey}"][data-person-key="${key}"]`;
+      const childCard = treeRoot ? treeRoot.querySelector(selector) : null;
+      if (childCard) childCard.classList.add('org-highlight-report');
+    });
+
+    if (treeRoot) {
+      treeRoot.querySelectorAll('.org-person-card').forEach(el => {
+        if (!el.classList.contains('org-highlight-manager') && !el.classList.contains('org-highlight-report')) {
+          el.classList.add('org-dimmed');
+        }
+      });
+    }
+
+    renderOrgReportsSummary(card, reports, reportNames);
+  }
+
+  function createOrgTreeCard(person, groupKey) {
     const card = document.createElement('div');
-    card.className = 'org-card';
+    card.className = 'org-card org-person-card';
+
+    const key = (person.Name || '').toLowerCase();
+    if (key) card.dataset.personKey = key;
+    if (groupKey) card.dataset.groupKey = groupKey;
+    card.addEventListener('click', onOrgPersonClick);
 
     const status = (person.capStatus || '').toLowerCase();
     const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
@@ -1479,7 +1564,15 @@
       return;
     }
 
-    const { nodes } = buildHierarchyForGroup(group.people);
+    const { nodes, roots } = buildHierarchyForGroup(group.people);
+
+    const nodeByKey = new Map();
+    nodes.forEach(node => {
+      const key = (node.person.Name || '').toLowerCase();
+      if (key) nodeByKey.set(key, node);
+    });
+    if (!state.orgTrees) state.orgTrees = {};
+    state.orgTrees[groupKey] = { nodes, roots, nodeByKey };
 
     const levels = new Map();
     let maxDepth = 0;
@@ -1515,7 +1608,7 @@
       const row = document.createElement('div');
       row.className = 'org-level-row';
       levelNodes.forEach(node => {
-        row.appendChild(createOrgTreeCard(node.person));
+        row.appendChild(createOrgTreeCard(node.person, groupKey));
       });
       detail.appendChild(row);
     }
@@ -1529,6 +1622,8 @@
       orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>';
       return;
     }
+
+    state.orgTrees = {};
 
     const groups = buildOrganigramGroups();
     orgTreeRoot.innerHTML = '';
@@ -1805,6 +1900,7 @@
   document.getElementById('btnClear').addEventListener('click', ()=>{
     state.rawObjects = [];
     state.people = [];
+    state.orgTrees = {};
     fileInput.value = '';
     peopleSearch.value = '';
     renderAll();
