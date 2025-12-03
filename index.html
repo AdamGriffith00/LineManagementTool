@@ -390,6 +390,13 @@
       margin-bottom: 8px;
     }
 
+    .org-group-list {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
     .org-group-header {
       display: flex;
       align-items: center;
@@ -413,62 +420,7 @@
       padding-left: 8px;
     }
 
-    .org-group-tree-btn {
-      background: #161a24;
-      color: var(--text-main);
-      border: 1px solid var(--border-soft);
-      border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-    .org-group-tree-btn:hover { background: #1b1f2c; }
-
-    .org-tree-detail {
-      margin-top: 16px;
-      padding: 16px 20px;
-      border-radius: 24px;
-      border: 1px solid var(--border-soft);
-      background: #18191f;
-    }
-    .org-tree-detail.empty { color: var(--text-soft); }
-
-    .org-tree-title {
-      font-weight: 700;
-      font-size: 14px;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: #9fa4b8;
-      margin-bottom: 12px;
-    }
-
-    .org-tree-grid {
-      position: relative;
-      margin-top: 12px;
-      display: grid;
-      gap: 32px;
-    }
-
-    .org-tree-column {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      align-items: center;
-    }
-
-    .org-tree-node {
-      position: relative;
-    }
-    .org-tree-node::before {
-      content: "";
-      position: absolute;
-      top: -16px;
-      left: 50%;
-      width: 2px;
-      height: 16px;
-      background: rgba(255,255,255,0.07);
-    }
-    .org-tree-column:first-child .org-tree-node::before { display: none; }
+    .org-group-actions { display: flex; gap: 6px; align-items: center; }
 
     .org-node-card {
       display: flex;
@@ -599,16 +551,16 @@
             <option value="region-discipline">Region + Discipline</option>
           </select>
         </div>
-        <button class="btn" id="orgBuildBtn" disabled>Build organigram</button>
+        <div class="org-group-actions">
+          <button class="btn" id="orgBuildBtn" disabled>Build organigram</button>
+          <button class="btn" id="exportPptBtn" disabled>Export PPT</button>
+        </div>
       </div>
       <div class="org-tree-wrap">
         <div id="orgTreeRoot" class="org-tree">
           <div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>
         </div>
       </div>
-      <section id="org-tree-detail" class="org-tree-detail empty">
-        <div class="subtle">Click a group to view its hierarchy.</div>
-      </section>
     </div>
   </section>
 </div>
@@ -643,7 +595,7 @@
     managersByName: new Map(),
   };
 
-  const GRADE_ORDER = [
+  const ORG_GRADE_ORDER = [
     'Senior Director',
     'Director',
     'Project Director',
@@ -1097,37 +1049,20 @@
   const orgGroupBy = document.getElementById('orgGroupBy');
   const orgBuildBtn = document.getElementById('orgBuildBtn');
   const orgTreeRoot = document.getElementById('orgTreeRoot');
-  const orgTreeDetail = document.getElementById('org-tree-detail');
-  let selectedOrgGroup = null;
-
-// --- Helpers for the hierarchy view ---------------------------------------
+  const exportPptBtn = document.getElementById('exportPptBtn');
 
   function canonicalName(name) {
     return (name || '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
   }
 
-  const GRADE_ORDER = [
-    'Senior Director',
-    'Director',
-    'Project Director',
-    'Associate Director',
-    'Executive Cost Manager',
-    'Senior Cost Manager',
-    'Cost Manager',
-    'Assistant Cost Manager',
-    'Graduate Cost Manager',
-    'Trainee Cost Manager'
-  ];
-
   function gradeIndex(grade) {
-    const idx = GRADE_ORDER.indexOf((grade || '').trim());
-    return idx === -1 ? GRADE_ORDER.length : idx;
+    const idx = ORG_GRADE_ORDER.indexOf((grade || '').trim());
+    return idx === -1 ? ORG_GRADE_ORDER.length : idx;
   }
 
-  // One card per person, re-using the existing "pill + chip" look
   function createPersonNodeCard(person) {
     const card = document.createElement('div');
-    card.className = 'org-node-row org-tree-node';
+    card.className = 'org-node-card org-tree-node';
 
     const main = document.createElement('div');
     main.className = 'org-person';
@@ -1139,11 +1074,10 @@
     `;
     card.appendChild(main);
 
-    // Capacity chip for managers – reuse overview logic
     if (person.IsManager) {
       const cap = Number(person.Capacity || 0);
       const used = Number(person.currentReports || 0);
-      const status = person.capStatus || (used < cap ? 'under' : (used === cap ? 'full' : 'over'));
+      const status = person.capStatus || (cap ? (used < cap ? 'under' : (used === cap ? 'full' : 'over')) : 'under');
 
       let cls = 'cap-chip cap-under';
       let label = 'Under';
@@ -1159,141 +1093,42 @@
     return card;
   }
 
-  // Build a complete tree for all people in this region
-  function buildOrgTreeForGroup(groupPeople) {
-    // Create a node for every person
-    const nodes = groupPeople.map(p => ({
-      person: p,
-      key: canonicalName(p.Name),
-      managerKey: canonicalName(p.Manager),
-      children: [],
-      depth: 0
-    }));
+  function renderOrgGroupList(groupEl, group) {
+    const managerList = group.people.filter(p=>p.IsManager || p.currentReports>0);
 
-    const byKey = new Map();
-    nodes.forEach(n => {
-      if (n.key) byKey.set(n.key, n);
+    const header = document.createElement('div');
+    header.className = 'org-group-header';
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'org-group-title';
+    titleEl.textContent = group.label;
+    header.appendChild(titleEl);
+
+    const meta = document.createElement('span');
+    meta.className = 'org-group-meta';
+    meta.textContent = `${group.people.length} people${managerList.length ? ` • ${managerList.length} managers` : ''}`;
+    header.appendChild(meta);
+
+    groupEl.appendChild(header);
+
+    const list = document.createElement('div');
+    list.className = 'org-group-list';
+    const sorted = [...group.people].sort((a,b)=>{
+      const ga = gradeIndex(a.Grade);
+      const gb = gradeIndex(b.Grade);
+      if (ga !== gb) return ga - gb;
+      return (a.FullName || '').localeCompare(b.FullName || '');
     });
-
-    // Link children to managers (only within this region)
-    nodes.forEach(node => {
-      const mgr = node.managerKey && byKey.get(node.managerKey);
-      if (mgr && mgr !== node) {
-        mgr.children.push(node);
-      }
+    sorted.forEach(person=>{
+      list.appendChild(createPersonNodeCard(person));
     });
-
-    // Roots: people whose manager is not in this region (or self / blank)
-    const roots = nodes.filter(node => {
-      const mgr = node.managerKey && byKey.get(node.managerKey);
-      return !mgr || mgr === node;
-    });
-
-    // Assign depths via BFS from all roots
-    const queue = [];
-    const visited = new Set();
-
-    roots.forEach(root => {
-      root.depth = 0;
-      queue.push(root);
-      visited.add(root);
-    });
-
-    while (queue.length) {
-      const current = queue.shift();
-      current.children.forEach(child => {
-        if (!visited.has(child)) {
-          child.depth = current.depth + 1;
-          visited.add(child);
-          queue.push(child);
-        }
-      });
-    }
-
-    // Any unvisited nodes (broken manager chain) → treat as extra roots at depth 0
-    nodes.forEach(node => {
-      if (!visited.has(node)) {
-        node.depth = 0;
-        roots.push(node);
-      }
-    });
-
-    return { nodes, roots };
-  }
-
-  // Render the selected region as a levelled grid (one column per depth)
-  function renderRegionTreeDetail(regionLabel, groupPeople) {
-    const container = document.getElementById('org-tree-detail');
-    if (!container) return;
-
-    container.classList.remove('empty');
-    container.innerHTML = '';
-
-    const title = document.createElement('div');
-    title.className = 'org-tree-title';
-    title.textContent = regionLabel.toUpperCase() + ' – Hierarchy';
-    container.appendChild(title);
-
-    const { nodes } = buildOrgTreeForGroup(groupPeople);
-
-    // Group all nodes by depth
-    const levels = new Map();
-    nodes.forEach(node => {
-      const d = node.depth || 0;
-      if (!levels.has(d)) levels.set(d, []);
-      levels.get(d).push(node);
-    });
-
-    const maxDepth = Math.max(...levels.keys());
-
-    const grid = document.createElement('div');
-    grid.className = 'org-tree-grid';
-    grid.style.display = 'grid';
-    grid.style.gridTemplateColumns = `repeat(${maxDepth + 1}, minmax(0, 1fr))`;
-    grid.style.gap = '24px';
-    container.appendChild(grid);
-
-    let renderedCount = 0;
-
-    for (let depth = 0; depth <= maxDepth; depth++) {
-      const col = document.createElement('div');
-      col.className = 'org-tree-column';
-      col.style.display = 'flex';
-      col.style.flexDirection = 'column';
-      col.style.alignItems = 'center';
-      col.style.gap = '12px';
-
-      const levelNodes = levels.get(depth) || [];
-
-      levelNodes.sort((a, b) => {
-        const ga = gradeIndex(a.person.Grade);
-        const gb = gradeIndex(b.person.Grade);
-        if (ga !== gb) return ga - gb;
-        return (a.person.FullName || '').localeCompare(b.person.FullName || '');
-      });
-
-      levelNodes.forEach(node => {
-        const card = createPersonNodeCard(node.person);
-        col.appendChild(card);
-        renderedCount++;
-      });
-
-      grid.appendChild(col);
-    }
-
-    console.log(
-      'Region tree', regionLabel,
-      'nodes:', renderedCount,
-      'expected:', groupPeople.length
-    );
+    groupEl.appendChild(list);
   }
 
   function renderOrgTree(){
     const people = state.people || [];
     if (!people.length){
       orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab first.</div>';
-      orgTreeDetail.classList.add('empty');
-      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
       return;
     }
     const mode = orgGroupBy.value;
@@ -1318,9 +1153,6 @@
       console.warn('Organigram grouping mismatch', { totalInGroups, peopleLength: people.length });
     }
 
-    selectedOrgGroup = null;
-    orgTreeDetail.classList.add('empty');
-    orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
     const keys = Object.keys(groups).sort((a,b)=> a.localeCompare(b));
     orgTreeRoot.innerHTML = '';
 
@@ -1331,36 +1163,7 @@
       const groupEl = document.createElement('div');
       groupEl.className = 'org-group';
 
-      const header = document.createElement('div');
-      header.className = 'org-group-header';
-      header.dataset.groupKey = key;
-
-      const titleEl = document.createElement('span');
-      titleEl.className = 'org-group-title';
-      titleEl.textContent = group.label;
-      header.appendChild(titleEl);
-
-      const managerList = group.people.filter(p=>p.IsManager || p.currentReports>0);
-      const meta = document.createElement('span');
-      meta.className = 'org-group-meta';
-      meta.textContent = `${group.people.length} people${managerList.length ? ` • ${managerList.length} managers` : ''}`;
-      header.appendChild(meta);
-
-      const btn = document.createElement('button');
-      btn.className = 'org-group-tree-btn';
-      btn.textContent = 'View tree';
-      header.appendChild(btn);
-
-      const handleSelect = ()=>{
-        selectedOrgGroup = key;
-        document.querySelectorAll('.org-group-header').forEach(h=>h.classList.toggle('active', h.dataset.groupKey===key));
-        renderRegionTreeDetail(group.label, group.people);
-      };
-
-      header.addEventListener('click', handleSelect);
-      btn.addEventListener('click', e=>{ e.stopPropagation(); handleSelect(); });
-
-      groupEl.appendChild(header);
+      renderOrgGroupList(groupEl, group);
       orgTreeRoot.appendChild(groupEl);
     });
 
@@ -1369,7 +1172,94 @@
     }
   }
 
+  function buildOrgTreeForRegion(peopleInRegion) {
+    const nodes = peopleInRegion.map(p => ({
+      person: p,
+      key: canonicalName(p.FullName || p.Name),
+      managerKey: canonicalName(p.Manager),
+      children: []
+    }));
+
+    const byKey = new Map();
+    nodes.forEach(n => { if (n.key) byKey.set(n.key, n); });
+
+    nodes.forEach(node => {
+      const mgr = node.managerKey && byKey.get(node.managerKey);
+      if (mgr && mgr !== node) {
+        mgr.children.push(node);
+      }
+    });
+
+    const roots = nodes.filter(node => {
+      const mgr = node.managerKey && byKey.get(node.managerKey);
+      return !mgr || mgr === node;
+    });
+
+    return roots;
+  }
+
+  function exportOrganigramToPpt() {
+    const allPeople = state.people || [];
+    if (!allPeople.length){
+      alert('Please load a CSV/XLSX first.');
+      return;
+    }
+    if (orgGroupBy.value !== 'region'){
+      alert('Please group by Region before exporting to PowerPoint.');
+      return;
+    }
+
+    const pptx = new PptxGenJS();
+    const groups = new Map();
+    allPeople.forEach(p => {
+      const region = p.Region || 'Unknown region';
+      if (!groups.has(region)) groups.set(region, []);
+      groups.get(region).push(p);
+    });
+
+    groups.forEach((peopleInRegion, regionLabel) => {
+      const slide = pptx.addSlide();
+      slide.addText(`${regionLabel} – Line Management Organigram`, {
+        x: 0.5, y: 0.3, w: 9, h: 0.5,
+        fontSize: 20, bold: true
+      });
+
+      const roots = buildOrgTreeForRegion(peopleInRegion);
+      let y = 1.0;
+
+      function addPersonBullet(node, level){
+        const p = node.person;
+        const cap = Number(p.Capacity || 0);
+        const used = Number(p.currentReports || 0);
+        const status = p.capStatus || (cap ? (used < cap ? 'Under' : (used === cap ? 'At' : 'Over')) : '');
+        const details = [
+          p.FullName || p.Name || '',
+          p.Grade || '',
+          p.Discipline || '',
+          p.Office || ''
+        ].filter(Boolean).join(' • ');
+        const capText = cap ? ` (${status} ${used}/${cap})` : '';
+
+        slide.addText(`${details}${capText}`, {
+          x: 0.7 + level * 0.6,
+          y,
+          w: 9,
+          fontSize: 12,
+          bullet: { indentLevel: level }
+        });
+        y += 0.3;
+
+        node.children.forEach(child => addPersonBullet(child, level + 1));
+      }
+
+      roots.forEach(root => addPersonBullet(root, 0));
+    });
+
+    pptx.writeFile({ fileName: 'LineManagementOrganigram.pptx' });
+  }
+
   orgBuildBtn.addEventListener('click', renderOrgTree);
+  exportPptBtn.addEventListener('click', exportOrganigramToPpt);
 
   // --- Tabs --------------------------------------------------------------
   document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -1440,19 +1330,16 @@
     fillFilterOptions();
     const hasData = (state.people || []).length>0;
     orgBuildBtn.disabled = !hasData;
+    exportPptBtn.disabled = !hasData;
     if (!hasData){
       fmResults.innerHTML = '<div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>';
       orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>';
-      orgTreeDetail.classList.add('empty');
-      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
-    } else if (!selectedOrgGroup){
-      orgTreeDetail.classList.add('empty');
-      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
     }
   }
 
   renderAll();
 })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 </body>
 </html>
