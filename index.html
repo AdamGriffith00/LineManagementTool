@@ -575,6 +575,7 @@
   </section>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script>
 (function(){
   // --- Canonical columns / aliases ---------------------------------------
@@ -1308,7 +1309,7 @@
       return;
     }
 
-    const pptx = new PptxGenJS();
+    const pptx = new pptxgen();
     const groups = new Map();
     allPeople.forEach(p => {
       const region = p.Region || 'Unknown region';
@@ -1474,6 +1475,5 @@
   renderAll();
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 </body>
 </html>
