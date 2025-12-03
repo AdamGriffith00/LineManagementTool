@@ -682,6 +682,18 @@
     return isNaN(n) ? 0 : n;
   }
 
+  function capacityDelta(person) {
+    const cap = Number(person.Capacity || 0);
+    const used = Number(person.currentReports || 0);
+    return used - cap; // > 0 over capacity, < 0 under, 0 at
+  }
+
+  function freeCapacity(person) {
+    const cap = Number(person.Capacity || 0);
+    const used = Number(person.currentReports || 0);
+    return cap - used; // > 0 free, < 0 over, 0 at
+  }
+
   function capacityMeta(p){
     const used = p.currentReports || 0;
     const cap = p.Capacity || 0;
@@ -1055,6 +1067,78 @@
     fmFreeCap.value = 1;
     fmResults.innerHTML = '<div class="subtle">Cleared. Set filters and click <strong>Suggest</strong>.</div>';
   });
+
+  // --- Line managers by region -------------------------------------------
+  const capacityRegionSelect = document.getElementById('capacity-region');
+  const capacityStatusSelect = document.getElementById('capacity-status');
+  const capacityResults = document.getElementById('capacity-results');
+
+  function fillCapacityFilters(){
+    if (!capacityRegionSelect) return;
+    fillSelect(capacityRegionSelect, uniq((state.people || []).map(p=>p.Region)));
+  }
+
+  function updateCapacityResults(){
+    if (!capacityRegionSelect || !capacityStatusSelect || !capacityResults) return;
+    const people = state.people || [];
+    const regionFilter = capacityRegionSelect.value;
+    const statusFilter = capacityStatusSelect.value;
+
+    const filtered = people.filter(p=>{
+      const isManager = p.IsManager || p.currentReports>0;
+      if (!isManager) return false;
+      if (regionFilter && p.Region !== regionFilter) return false;
+      if (statusFilter === 'under') return p.capStatus === 'under';
+      if (statusFilter === 'full') return p.capStatus === 'full';
+      if (statusFilter === 'over') return p.capStatus === 'over';
+      return true;
+    });
+
+    filtered.sort((a, b) => {
+      const status = statusFilter;
+
+      if (status === 'over') {
+        const deltaA = capacityDelta(a);
+        const deltaB = capacityDelta(b);
+        if (deltaA !== deltaB) return deltaB - deltaA;
+      } else {
+        const freeA = freeCapacity(a);
+        const freeB = freeCapacity(b);
+        if (freeA !== freeB) return freeB - freeA;
+      }
+
+      const regionCompare = (a.Region || '').localeCompare(b.Region || '');
+      if (regionCompare !== 0) return regionCompare;
+
+      return (a.FullName || a.Name || '').localeCompare(b.FullName || b.Name || '');
+    });
+
+    if (!filtered.length){
+      capacityResults.innerHTML = '<div class="subtle">No managers match those filters.</div>';
+      return;
+    }
+
+    capacityResults.innerHTML = filtered.map(p=>{
+      return `
+        <div class="manager-row">
+          <div class="manager-main">
+            <strong>${p.FullName || p.Name || ''}</strong>
+            <div class="manager-meta">
+              ${p.Region ? `<span>${p.Region}</span>` : ''}
+              ${p.Discipline ? `<span>${p.Discipline}</span>` : ''}
+              ${p.Office ? `<span>${p.Office}</span>` : ''}
+            </div>
+          </div>
+          ${capacityChip(p,{showIfNonManager:true})}
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (capacityRegionSelect && capacityStatusSelect){
+    capacityRegionSelect.addEventListener('change', updateCapacityResults);
+    capacityStatusSelect.addEventListener('change', updateCapacityResults);
+  }
 
   // --- Organigram --------------------------------------------------------
   const orgGroupBy = document.getElementById('orgGroupBy');
@@ -1471,6 +1555,8 @@
     renderSummary();
     renderPeopleTable();
     fillFilterOptions();
+    fillCapacityFilters();
+    updateCapacityResults();
     const hasData = (state.people || []).length>0;
     orgBuildBtn.disabled = !hasData;
     exportPptBtn.disabled = !hasData;
