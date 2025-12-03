@@ -1313,6 +1313,47 @@
     return idx === -1 ? GRADE_ORDER.length : idx;
   }
 
+  function gradeDepthIndex(gradeName) {
+    if (!gradeName) return 99;
+    const g = gradeName.toLowerCase();
+
+    // Each inner array = labels that share the same depth.
+    const levels = [
+      // 0 – Senior Director
+      ['senior director'],
+      // 1 – Director (plain)
+      ['director'],
+      // 2 – Project Director
+      ['project director'],
+      // 3 – Associate Director
+      ['associate director'],
+      // 4 – Executive CM / QS
+      ['executive cost manager', 'executive quantity surveyor'],
+      // 5 – Senior CM / QS
+      ['senior cost manager', 'senior quantity surveyor'],
+      // 6 – Cost Manager / Quantity Surveyor
+      ['cost manager', 'quantity surveyor'],
+      // 7 – Assistant CM / QS
+      ['assistant cost manager', 'assistant quantity surveyor'],
+      // 8 – Graduate CM / QS
+      ['graduate cost manager', 'graduate quantity surveyor'],
+      // 9 – Trainee CM / QS
+      ['trainee cost manager', 'trainee quantity surveyor'],
+    ];
+
+    for (let depth = 0; depth < levels.length; depth++) {
+      const labels = levels[depth];
+      for (let i = 0; i < labels.length; i++) {
+        if (g.includes(labels[i])) {
+          return depth;
+        }
+      }
+    }
+
+    // Unknown / non-standard grades go to the bottom
+    return 99;
+  }
+
   function createOrgTreeCard(person) {
     const card = document.createElement('div');
     card.className = 'org-card';
@@ -1399,6 +1440,10 @@
         node.depth = 0;
         roots.push(node);
       }
+    });
+
+    nodes.forEach(node => {
+      node.depth = gradeDepthIndex(node.person.Grade || node.person.GradeLevel || '');
     });
 
     return { nodes, roots };
