@@ -1100,156 +1100,192 @@
   const orgTreeDetail = document.getElementById('org-tree-detail');
   let selectedOrgGroup = null;
 
-  function canonicalName(name){
+// --- Helpers for the hierarchy view ---------------------------------------
+
+  function canonicalName(name) {
     return (name || '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
   }
 
-  function gradeIndex(grade){
+  const GRADE_ORDER = [
+    'Senior Director',
+    'Director',
+    'Project Director',
+    'Associate Director',
+    'Executive Cost Manager',
+    'Senior Cost Manager',
+    'Cost Manager',
+    'Assistant Cost Manager',
+    'Graduate Cost Manager',
+    'Trainee Cost Manager'
+  ];
+
+  function gradeIndex(grade) {
     const idx = GRADE_ORDER.indexOf((grade || '').trim());
     return idx === -1 ? GRADE_ORDER.length : idx;
   }
 
-  function sortNodes(nodes){
-    nodes.sort((a,b)=>{
-      const ga = gradeIndex(a.person.Grade);
-      const gb = gradeIndex(b.person.Grade);
-      if (ga !== gb) return ga - gb;
-      return (a.person.FullName || '').localeCompare(b.person.FullName || '');
-    });
-  }
-
-  function buildOrgTreeForGroup(groupPeople){
-    const byName = new Map();
-    groupPeople.forEach(p=>{
-      const key = canonicalName(p.Name || p.FullName);
-      byName.set(key, p);
-    });
-
-    const nodesByPerson = new Map();
-    groupPeople.forEach(p=>{
-      nodesByPerson.set(p, { person: p, children: [], depth: 0 });
-    });
-
-    const roots = [];
-    const groupSet = new Set(groupPeople);
-    groupPeople.forEach(p=>{
-      const node = nodesByPerson.get(p);
-      const mgrName = canonicalName(p.Manager);
-      const managerPerson = byName.get(mgrName);
-      if (managerPerson && managerPerson !== p && groupSet.has(managerPerson)){
-        const mgrNode = nodesByPerson.get(managerPerson);
-        mgrNode.children.push(node);
-      } else {
-        roots.push(node);
-      }
-    });
-
-    if (!roots.length){
-      roots.push(...nodesByPerson.values());
-    }
-
-    function markDepth(node, depth){
-      node.depth = depth;
-      (node.children||[]).forEach(child=>markDepth(child, depth+1));
-    }
-    roots.forEach(r=>markDepth(r,0));
-
-    sortNodes(roots);
-    roots.forEach(sortChildrenRecursive);
-
-    return roots;
-  }
-
-  function sortChildrenRecursive(node){
-    if (!node.children || !node.children.length) return;
-    sortNodes(node.children);
-    node.children.forEach(sortChildrenRecursive);
-  }
-
-  function groupNodesByDepth(roots){
-    const levels = new Map();
-    function visit(node){
-      const depth = node.depth || 0;
-      if (!levels.has(depth)) levels.set(depth, []);
-      levels.get(depth).push(node);
-      (node.children||[]).forEach(visit);
-    }
-    roots.forEach(visit);
-    return levels;
-  }
-
-  function sortLevel(nodes){
-    nodes.sort((a,b)=>{
-      const ga = gradeIndex(a.person.Grade);
-      const gb = gradeIndex(b.person.Grade);
-      if (ga !== gb) return ga - gb;
-      return (a.person.FullName || '').localeCompare(b.person.FullName || '');
-    });
-  }
-
-  function createPersonNodeCard(person){
+  // One card per person, re-using the existing "pill + chip" look
+  function createPersonNodeCard(person) {
     const card = document.createElement('div');
-    card.className = 'org-node-card';
+    card.className = 'org-node-row org-tree-node';
 
     const main = document.createElement('div');
     main.className = 'org-person';
     main.innerHTML = `
-      <span class="org-person-name">${person.FullName || ''}</span>
+      <span class="org-person-name">${person.FullName || person.Name || ''}</span>
       ${person.Grade ? `<span class="org-person-role">${person.Grade}</span>` : ''}
       ${person.Discipline ? `<span class="org-person-tag">${person.Discipline}</span>` : ''}
       ${person.Office ? `<span class="org-person-tag">${person.Office}</span>` : ''}
     `;
     card.appendChild(main);
 
-    if (person.IsManager || person.currentReports>0){
-      const capSpan = document.createElement('span');
-      capSpan.innerHTML = capacityChip(person,{showIfNonManager:true});
-      card.appendChild(capSpan);
+    // Capacity chip for managers – reuse overview logic
+    if (person.IsManager) {
+      const cap = Number(person.Capacity || 0);
+      const used = Number(person.currentReports || 0);
+      const status = person.capStatus || (used < cap ? 'under' : (used === cap ? 'full' : 'over'));
+
+      let cls = 'cap-chip cap-under';
+      let label = 'Under';
+      if (status === 'full') { cls = 'cap-chip cap-full'; label = 'At'; }
+      if (status === 'over') { cls = 'cap-chip cap-over'; label = 'Over'; }
+
+      const chip = document.createElement('span');
+      chip.className = cls;
+      chip.innerHTML = `<span>${label}</span><strong>${used} / ${cap}</strong>`;
+      card.appendChild(chip);
     }
 
     return card;
   }
 
-  function renderRegionTreeDetail(groupLabel, groupPeople){
-    if (!groupPeople || !groupPeople.length){
-      orgTreeDetail.classList.add('empty');
-      orgTreeDetail.innerHTML = '<div class="subtle">Click a group to view its hierarchy.</div>';
-      return;
+  // Build a complete tree for all people in this region
+  function buildOrgTreeForGroup(groupPeople) {
+    // Create a node for every person
+    const nodes = groupPeople.map(p => ({
+      person: p,
+      key: canonicalName(p.Name),
+      managerKey: canonicalName(p.Manager),
+      children: [],
+      depth: 0
+    }));
+
+    const byKey = new Map();
+    nodes.forEach(n => {
+      if (n.key) byKey.set(n.key, n);
+    });
+
+    // Link children to managers (only within this region)
+    nodes.forEach(node => {
+      const mgr = node.managerKey && byKey.get(node.managerKey);
+      if (mgr && mgr !== node) {
+        mgr.children.push(node);
+      }
+    });
+
+    // Roots: people whose manager is not in this region (or self / blank)
+    const roots = nodes.filter(node => {
+      const mgr = node.managerKey && byKey.get(node.managerKey);
+      return !mgr || mgr === node;
+    });
+
+    // Assign depths via BFS from all roots
+    const queue = [];
+    const visited = new Set();
+
+    roots.forEach(root => {
+      root.depth = 0;
+      queue.push(root);
+      visited.add(root);
+    });
+
+    while (queue.length) {
+      const current = queue.shift();
+      current.children.forEach(child => {
+        if (!visited.has(child)) {
+          child.depth = current.depth + 1;
+          visited.add(child);
+          queue.push(child);
+        }
+      });
     }
 
-    const roots = buildOrgTreeForGroup(groupPeople);
-    const levels = groupNodesByDepth(roots);
-    const depthKeys = Array.from(levels.keys());
-    const maxDepth = depthKeys.length ? Math.max(...depthKeys) : 0;
+    // Any unvisited nodes (broken manager chain) → treat as extra roots at depth 0
+    nodes.forEach(node => {
+      if (!visited.has(node)) {
+        node.depth = 0;
+        roots.push(node);
+      }
+    });
 
-    orgTreeDetail.classList.remove('empty');
-    orgTreeDetail.innerHTML = '';
+    return { nodes, roots };
+  }
+
+  // Render the selected region as a levelled grid (one column per depth)
+  function renderRegionTreeDetail(regionLabel, groupPeople) {
+    const container = document.getElementById('org-tree-detail');
+    if (!container) return;
+
+    container.classList.remove('empty');
+    container.innerHTML = '';
 
     const title = document.createElement('div');
     title.className = 'org-tree-title';
-    title.textContent = `${groupLabel.toUpperCase()} – Hierarchy`;
-    orgTreeDetail.appendChild(title);
+    title.textContent = regionLabel.toUpperCase() + ' – Hierarchy';
+    container.appendChild(title);
+
+    const { nodes } = buildOrgTreeForGroup(groupPeople);
+
+    // Group all nodes by depth
+    const levels = new Map();
+    nodes.forEach(node => {
+      const d = node.depth || 0;
+      if (!levels.has(d)) levels.set(d, []);
+      levels.get(d).push(node);
+    });
+
+    const maxDepth = Math.max(...levels.keys());
 
     const grid = document.createElement('div');
     grid.className = 'org-tree-grid';
+    grid.style.display = 'grid';
     grid.style.gridTemplateColumns = `repeat(${maxDepth + 1}, minmax(0, 1fr))`;
-    orgTreeDetail.appendChild(grid);
+    grid.style.gap = '24px';
+    container.appendChild(grid);
 
-    for (let depth = 0; depth <= maxDepth; depth++){
+    let renderedCount = 0;
+
+    for (let depth = 0; depth <= maxDepth; depth++) {
       const col = document.createElement('div');
       col.className = 'org-tree-column';
-      const nodes = levels.get(depth) || [];
-      sortLevel(nodes);
-      nodes.forEach(node=>{
-        const card = createPersonNodeCard(node.person);
-        card.classList.add('org-tree-node');
-        col.appendChild(card);
+      col.style.display = 'flex';
+      col.style.flexDirection = 'column';
+      col.style.alignItems = 'center';
+      col.style.gap = '12px';
+
+      const levelNodes = levels.get(depth) || [];
+
+      levelNodes.sort((a, b) => {
+        const ga = gradeIndex(a.person.Grade);
+        const gb = gradeIndex(b.person.Grade);
+        if (ga !== gb) return ga - gb;
+        return (a.person.FullName || '').localeCompare(b.person.FullName || '');
       });
+
+      levelNodes.forEach(node => {
+        const card = createPersonNodeCard(node.person);
+        col.appendChild(card);
+        renderedCount++;
+      });
+
       grid.appendChild(col);
     }
 
-    const cards = orgTreeDetail.querySelectorAll('.org-tree-node');
-    console.log('Organigram DOM rows for', groupLabel, ':', cards.length, 'expected:', groupPeople.length);
+    console.log(
+      'Region tree', regionLabel,
+      'nodes:', renderedCount,
+      'expected:', groupPeople.length
+    );
   }
 
   function renderOrgTree(){
