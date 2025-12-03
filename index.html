@@ -520,10 +520,6 @@
           <div class="pill-label">Find a line manager</div>
           <div class="filters-row">
             <div class="field">
-              <div class="field-label">Discipline</div>
-              <select id="fmDiscipline"></select>
-            </div>
-            <div class="field">
               <div class="field-label">Region</div>
               <select id="fmRegion"></select>
             </div>
@@ -543,6 +539,30 @@
           <div class="results-list" id="fmResults">
             <div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>
           </div>
+        </div>
+
+        <div class="card" id="manager-capacity-panel">
+          <div class="pill-label">Line managers by region</div>
+          <div class="field">
+            <div class="field-label">Region</div>
+            <select id="capacity-region">
+              <option value="Any">Any region</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-label">Capacity status</div>
+            <select id="capacity-status">
+              <option value="any">Any</option>
+              <option value="under">Under capacity</option>
+              <option value="full">At capacity</option>
+              <option value="over">Over capacity</option>
+            </select>
+          </div>
+          <div class="field" style="display:flex;gap:6px;">
+            <button class="btn" id="capacity-search">Search</button>
+            <button class="btn btn-ghost" id="capacity-clear">Clear</button>
+          </div>
+          <div id="capacity-results" class="results-list"></div>
         </div>
       </div>
     </div>
@@ -992,7 +1012,6 @@
   peopleSearch.addEventListener('input', renderPeopleTable);
 
   // --- Find a manager ----------------------------------------------------
-  const fmDiscipline = document.getElementById('fmDiscipline');
   const fmRegion = document.getElementById('fmRegion');
   const fmGrade = document.getElementById('fmGrade');
   const fmFreeCap = document.getElementById('fmFreeCap');
@@ -1007,7 +1026,6 @@
 
   function fillFilterOptions(){
     const people = state.people || [];
-    fillSelect(fmDiscipline, uniq(people.map(p=>p.Discipline)));
     fillSelect(fmRegion, uniq(people.map(p=>p.Region)));
     fillSelect(fmGrade, uniq(people.map(p=>p.Grade)));
     const hasData = people.length>0;
@@ -1040,14 +1058,12 @@
 
   fmSearchBtn.addEventListener('click', ()=>{
     const people = state.people || [];
-    const disc = fmDiscipline.value;
     const reg = fmRegion.value;
     const grade = fmGrade.value;
     const minFree = parseInt(fmFreeCap.value || '0', 10);
     const candidates = people.filter(p=>{
       const isManager = p.IsManager || p.currentReports>0;
       if (!isManager) return false;
-      if (disc && p.Discipline !== disc) return false;
       if (reg && p.Region !== reg) return false;
       if (grade && p.Grade !== grade) return false;
       if ((p.freeSlots || 0) < minFree) return false;
@@ -1061,7 +1077,6 @@
   });
 
   fmClearBtn.addEventListener('click', ()=>{
-    fmDiscipline.value = '';
     fmRegion.value = '';
     fmGrade.value = '';
     fmFreeCap.value = 1;
@@ -1072,26 +1087,34 @@
   const capacityRegionSelect = document.getElementById('capacity-region');
   const capacityStatusSelect = document.getElementById('capacity-status');
   const capacityResults = document.getElementById('capacity-results');
+  const capacitySearchBtn = document.getElementById('capacity-search');
+  const capacityClearBtn = document.getElementById('capacity-clear');
 
-  function fillCapacityFilters(){
+  function populateCapacityRegions(){
     if (!capacityRegionSelect) return;
-    fillSelect(capacityRegionSelect, uniq((state.people || []).map(p=>p.Region)));
+    capacityRegionSelect.innerHTML = '<option value="Any">Any region</option>';
+    const regions = new Set();
+    (state.people || []).forEach(p=>{ if (p.Region) regions.add(p.Region); });
+    Array.from(regions).sort().forEach(region=>{
+      const opt = document.createElement('option');
+      opt.value = region;
+      opt.textContent = region;
+      capacityRegionSelect.appendChild(opt);
+    });
   }
 
   function updateCapacityResults(){
-    if (!capacityRegionSelect || !capacityStatusSelect || !capacityResults) return;
-    const people = state.people || [];
-    const regionFilter = capacityRegionSelect.value;
-    const statusFilter = capacityStatusSelect.value;
+    if (!capacityResults) return;
 
-    const filtered = people.filter(p=>{
-      const isManager = p.IsManager || p.currentReports>0;
-      if (!isManager) return false;
-      if (regionFilter && p.Region !== regionFilter) return false;
-      if (statusFilter === 'under') return p.capStatus === 'under';
-      if (statusFilter === 'full') return p.capStatus === 'full';
-      if (statusFilter === 'over') return p.capStatus === 'over';
-      return true;
+    const regionFilter = capacityRegionSelect ? capacityRegionSelect.value : 'Any';
+    const statusFilter = capacityStatusSelect ? capacityStatusSelect.value : 'any';
+
+    const managers = (state.people || []).filter(p => p.IsManager);
+
+    const filtered = managers.filter(p => {
+      const regionOk = regionFilter === 'Any' || (p.Region || '') === regionFilter;
+      const statusOk = statusFilter === 'any' || (p.capStatus || '').toLowerCase() === statusFilter;
+      return regionOk && statusOk;
     });
 
     filtered.sort((a, b) => {
@@ -1113,31 +1136,44 @@
       return (a.FullName || a.Name || '').localeCompare(b.FullName || b.Name || '');
     });
 
+    capacityResults.innerHTML = '';
+
     if (!filtered.length){
-      capacityResults.innerHTML = '<div class="subtle">No managers match those filters.</div>';
+      capacityResults.innerHTML = '<p class="muted">No managers match these filters.</p>';
       return;
     }
 
-    capacityResults.innerHTML = filtered.map(p=>{
-      return `
-        <div class="manager-row">
-          <div class="manager-main">
-            <strong>${p.FullName || p.Name || ''}</strong>
-            <div class="manager-meta">
-              ${p.Region ? `<span>${p.Region}</span>` : ''}
-              ${p.Discipline ? `<span>${p.Discipline}</span>` : ''}
-              ${p.Office ? `<span>${p.Office}</span>` : ''}
-            </div>
-          </div>
-          ${capacityChip(p,{showIfNonManager:true})}
+    filtered.forEach(p => {
+      const status = (p.capStatus || '').toLowerCase();
+      const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
+      const row = document.createElement('div');
+      row.className = 'manager-row';
+      row.innerHTML = `
+        <div class="manager-main">
+          <strong>${p.FullName || p.Name}</strong>
+          <span>${p.Grade || ''}</span>
+          <span>${p.Office || ''}</span>
+          <span>${p.Region || ''}</span>
+        </div>
+        <div class="manager-cap">
+          <span class="cap-chip ${status === 'over' ? 'cap-over' : status === 'full' ? 'cap-full' : 'cap-under'}">
+            <span>${statusLabel}</span><strong>${p.currentReports || 0}/${p.Capacity || 0}</strong>
+          </span>
         </div>
       `;
-    }).join('');
+      capacityResults.appendChild(row);
+    });
   }
 
-  if (capacityRegionSelect && capacityStatusSelect){
-    capacityRegionSelect.addEventListener('change', updateCapacityResults);
-    capacityStatusSelect.addEventListener('change', updateCapacityResults);
+  if (capacitySearchBtn){
+    capacitySearchBtn.addEventListener('click', updateCapacityResults);
+  }
+  if (capacityClearBtn){
+    capacityClearBtn.addEventListener('click', ()=>{
+      if (capacityRegionSelect) capacityRegionSelect.value = 'Any';
+      if (capacityStatusSelect) capacityStatusSelect.value = 'any';
+      if (capacityResults) capacityResults.innerHTML = '';
+    });
   }
 
   // --- Organigram --------------------------------------------------------
@@ -1555,7 +1591,7 @@
     renderSummary();
     renderPeopleTable();
     fillFilterOptions();
-    fillCapacityFilters();
+    populateCapacityRegions();
     updateCapacityResults();
     const hasData = (state.people || []).length>0;
     orgBuildBtn.disabled = !hasData;
