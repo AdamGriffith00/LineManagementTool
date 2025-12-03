@@ -432,6 +432,16 @@
       background: #111420;
     }
 
+    .org-node-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 12px;
+      border: 1px solid #262a35;
+      background: #111420;
+    }
+
     .org-person {
       display: inline-flex;
       align-items: center;
@@ -595,7 +605,7 @@
     managersByName: new Map(),
   };
 
-  const ORG_GRADE_ORDER = [
+  const GRADE_ORDER = [
     'Senior Director',
     'Director',
     'Project Director',
@@ -1051,18 +1061,21 @@
   const orgTreeRoot = document.getElementById('orgTreeRoot');
   const exportPptBtn = document.getElementById('exportPptBtn');
 
+  // --- Helpers for the hierarchy view ---------------------------------------
+
   function canonicalName(name) {
     return (name || '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
   }
 
   function gradeIndex(grade) {
-    const idx = ORG_GRADE_ORDER.indexOf((grade || '').trim());
-    return idx === -1 ? ORG_GRADE_ORDER.length : idx;
+    const idx = GRADE_ORDER.indexOf((grade || '').trim());
+    return idx === -1 ? GRADE_ORDER.length : idx;
   }
 
+  // One card per person, re-using the existing "pill + chip" look
   function createPersonNodeCard(person) {
     const card = document.createElement('div');
-    card.className = 'org-node-card org-tree-node';
+    card.className = 'org-node-row org-tree-node';
 
     const main = document.createElement('div');
     main.className = 'org-person';
@@ -1173,16 +1186,23 @@
   }
 
   function buildOrgTreeForRegion(peopleInRegion) {
+    // Create node for each person
     const nodes = peopleInRegion.map(p => ({
       person: p,
-      key: canonicalName(p.FullName || p.Name),
+      key: canonicalName(p.Name || p.FullName),
       managerKey: canonicalName(p.Manager),
-      children: []
+      children: [],
+      depth: 0,
+      x: 0,
+      y: 0
     }));
 
     const byKey = new Map();
-    nodes.forEach(n => { if (n.key) byKey.set(n.key, n); });
+    nodes.forEach(n => {
+      if (n.key) byKey.set(n.key, n);
+    });
 
+    // Link children to managers (only within this region)
     nodes.forEach(node => {
       const mgr = node.managerKey && byKey.get(node.managerKey);
       if (mgr && mgr !== node) {
@@ -1190,12 +1210,91 @@
       }
     });
 
+    // Roots: people whose manager is not in this region (or blank / self)
     const roots = nodes.filter(node => {
       const mgr = node.managerKey && byKey.get(node.managerKey);
       return !mgr || mgr === node;
     });
 
-    return roots;
+    // Assign depth (level) via BFS from all roots
+    const queue = [];
+    const visited = new Set();
+
+    roots.forEach(root => {
+      root.depth = 0;
+      queue.push(root);
+      visited.add(root);
+    });
+
+    while (queue.length) {
+      const current = queue.shift();
+      current.children.forEach(child => {
+        if (!visited.has(child)) {
+          child.depth = current.depth + 1;
+          visited.add(child);
+          queue.push(child);
+        }
+      });
+    }
+
+    // Any unvisited nodes (broken manager chain) → treat as extra roots at depth 0
+    nodes.forEach(node => {
+      if (!visited.has(node)) {
+        node.depth = 0;
+        roots.push(node);
+      }
+    });
+
+    return { nodes, roots };
+  }
+
+  function layoutOrgTree(nodes) {
+    // Group nodes by depth
+    const levels = new Map();
+    let maxDepth = 0;
+    nodes.forEach(node => {
+      const d = node.depth || 0;
+      if (!levels.has(d)) levels.set(d, []);
+      levels.get(d).push(node);
+      if (d > maxDepth) maxDepth = d;
+    });
+
+    // Within each level, order peers by grade then name
+    levels.forEach(levelNodes => {
+      levelNodes.sort((a, b) => {
+        const ga = gradeIndex(a.person.Grade);
+        const gb = gradeIndex(b.person.Grade);
+        if (ga !== gb) return ga - gb;
+        return (a.person.FullName || a.person.Name || '').localeCompare(
+          b.person.FullName || b.person.Name || ''
+        );
+      });
+    });
+
+    const slideWidth = 10;
+    const leftMargin = 0.5;
+    const rightMargin = 0.5;
+    const availableWidth = slideWidth - leftMargin - rightMargin;
+    const boxWidth = 2.5;
+    const boxHeight = 0.6;
+    const topMargin = 1.2;
+    const levelGap = 1.3;
+
+    for (let depth = 0; depth <= maxDepth; depth++) {
+      const levelNodes = levels.get(depth) || [];
+      if (!levelNodes.length) continue;
+
+      const count = levelNodes.length;
+      const step = availableWidth / (count + 1);
+
+      levelNodes.forEach((node, index) => {
+        const centerX = leftMargin + step * (index + 1);
+        node.x = centerX - boxWidth / 2;
+        node.y = topMargin + depth * levelGap;
+        node.boxWidth = boxWidth;
+        node.boxHeight = boxHeight;
+      });
+    }
   }
 
   function exportOrganigramToPpt() {
@@ -1224,35 +1323,70 @@
         fontSize: 20, bold: true
       });
 
-      const roots = buildOrgTreeForRegion(peopleInRegion);
-      let y = 1.0;
+      const { nodes } = buildOrgTreeForRegion(peopleInRegion);
+      layoutOrgTree(nodes);
 
-      function addPersonBullet(node, level){
+      nodes.forEach(node => {
         const p = node.person;
+        const textLines = [];
+
+        textLines.push(p.FullName || p.Name || '');
+        if (p.Grade) textLines.push(p.Grade);
+        const details = [p.Discipline, p.Office].filter(Boolean).join(' • ');
+        if (details) textLines.push(details);
+
         const cap = Number(p.Capacity || 0);
         const used = Number(p.currentReports || 0);
         const status = p.capStatus || (cap ? (used < cap ? 'Under' : (used === cap ? 'At' : 'Over')) : '');
-        const details = [
-          p.FullName || p.Name || '',
-          p.Grade || '',
-          p.Discipline || '',
-          p.Office || ''
-        ].filter(Boolean).join(' • ');
-        const capText = cap ? ` (${status} ${used}/${cap})` : '';
+        if (cap) textLines.push(`${status} ${used}/${cap}`);
 
-        slide.addText(`${details}${capText}`, {
-          x: 0.7 + level * 0.6,
-          y,
-          w: 9,
-          fontSize: 12,
-          bullet: { indentLevel: level }
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: node.x,
+          y: node.y,
+          w: node.boxWidth,
+          h: node.boxHeight,
+          fill: { color: '1f2230' },
+          line: { color: 'ffffff', width: 0.5 },
+          rectRadius: 6
         });
-        y += 0.3;
 
-        node.children.forEach(child => addPersonBullet(child, level + 1));
-      }
+        slide.addText(textLines.join('\n'), {
+          x: node.x,
+          y: node.y,
+          w: node.boxWidth,
+          h: node.boxHeight,
+          fontSize: 11,
+          align: 'center',
+          valign: 'middle'
+        });
+      });
 
-      roots.forEach(root => addPersonBullet(root, 0));
+      const byKey = new Map();
+      nodes.forEach(n => {
+        const key = canonicalName(n.person.Name || n.person.FullName);
+        if (key) byKey.set(key, n);
+      });
+
+      nodes.forEach(node => {
+        const mgrKey = canonicalName(node.person.Manager);
+        const parent = mgrKey && byKey.get(mgrKey);
+        if (!parent || parent === node) return;
+
+        const parentCenterX = parent.x + parent.boxWidth / 2;
+        const parentBottomY = parent.y + parent.boxHeight;
+        const childCenterX = node.x + node.boxWidth / 2;
+        const childTopY = node.y;
+
+        slide.addLine({
+          x: parentCenterX,
+          y: parentBottomY,
+          x2: childCenterX,
+          y2: childTopY,
+          line: { width: 0.75, color: '808080' }
+        });
+      });
+
+      console.log('Region PPT tree', regionLabel, 'nodes:', nodes.length, 'expected:', peopleInRegion.length);
     });
 
     pptx.writeFile({ fileName: 'LineManagementOrganigram.pptx' });
