@@ -1,0 +1,2017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gleeds – Infrastructure Cost Management Line Management</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <!-- SheetJS for XLSX/XLS support -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #05060a;
+      --bg-card: #101116;
+      --bg-card-soft: #171821;
+      --border-soft: #262a35;
+      --text-main: #f7f7f9;
+      --text-soft: #a5aab5;
+      --accent-yellow: #ffd400;
+      --badge-soft: #171923;
+
+      --green-soft: rgba(46, 204, 113, 0.08);
+      --green-border: rgba(46, 204, 113, 0.4);
+      --green-text: #55d68a;
+
+      --yellow-soft: rgba(241, 196, 15, 0.12);
+      --yellow-border: rgba(241, 196, 15, 0.4);
+      --yellow-text: #f5d06a;
+
+      --red-soft: rgba(231, 76, 60, 0.12);
+      --red-border: rgba(231, 76, 60, 0.5);
+      --red-text: #ff9b8f;
+
+      --radius-card: 18px;
+      --radius-pill: 999px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #05060a;
+      color: var(--text-main);
+    }
+
+    .page {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 12px 20px 24px;
+    }
+
+    /* Header / branding --------------------------------------------------- */
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-logo {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: lowercase;
+    }
+    .brand-logo::after {
+      content: "G";
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      margin-left: 4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-yellow);
+      color: #000;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-top {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: #151823;
+      color: var(--text-main);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-top:hover {
+      background: #191c29;
+    }
+
+    /* Tabs --------------------------------------------------- */
+
+    .tabs-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .tab-btn {
+      padding: 8px 18px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-soft);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #181b27;
+      border-color: var(--border-soft);
+      color: var(--text-main);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+
+    /* Cards / layout --------------------------------------------------- */
+
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-card);
+      border: 1px solid var(--border-soft);
+      padding: 14px 16px 16px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    }
+
+    .card + .card { margin-top: 10px; }
+
+    .pill-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: var(--radius-pill);
+      background: #171923;
+      border: 1px solid var(--border-soft);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+      margin-bottom: 6px;
+    }
+
+    .subtle {
+      font-size: 13px;
+      color: var(--text-soft);
+    }
+
+    .summary-line {
+      font-size: 20px;
+      margin: 4px 0 4px;
+    }
+    .summary-line .label { opacity: 0.75; }
+    .summary-line .value { color: #fff; font-weight: 700; padding: 0 4px; }
+    .summary-line .dot { opacity: 0.5; padding: 0 6px; }
+
+    .summary-badges {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .summary-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-soft);
+      background: #171923;
+      font-size: 11px;
+    }
+    .summary-badge span { opacity: 0.8; }
+    .summary-badge strong { color: #fff; }
+
+    .shell-overview {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 16px;
+      align-items: flex-start;
+    }
+    @media (max-width: 1100px) {
+      .shell-overview {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .stack { display: flex; flex-direction: column; gap: 10px; }
+
+    .field { margin-bottom: 10px; }
+    .field-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+      margin-bottom: 4px;
+    }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border-soft);
+      background: #151823;
+      color: var(--text-main);
+      font-size: 13px;
+    }
+
+    input[type="file"] {
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      background: #ffd400;
+      color: #000;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-main);
+    }
+
+    /* People table --------------------------------------------------- */
+
+    .people-table-wrap {
+      overflow: auto;
+      max-height: 430px;
+      border-radius: 12px;
+      border: 1px solid var(--border-soft);
+      background: var(--bg-card-soft);
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 12px;
+    }
+    thead {
+      position: sticky;
+      top: 0;
+      background: #181b23;
+      z-index: 5;
+    }
+    th, td {
+      padding: 5px 8px;
+      border-bottom: 1px solid #1f2230;
+      white-space: nowrap;
+    }
+    th {
+      font-weight: 500;
+      color: var(--text-soft);
+      text-align: left;
+    }
+    tbody tr:hover { background: #171b27; }
+
+    /* Capacity chips --------------------------------------------------- */
+
+    .cap-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      font-size: 11px;
+      border: 1px solid var(--border-soft);
+      background: var(--badge-soft);
+    }
+    .cap-chip span { opacity: 0.85; }
+    .cap-chip strong { font-weight: 600; }
+
+    .cap-under {
+      background: var(--green-soft);
+      border-color: var(--green-border);
+      color: var(--green-text);
+    }
+    .cap-full {
+      background: var(--yellow-soft);
+      border-color: var(--yellow-border);
+      color: var(--yellow-text);
+    }
+    .cap-over {
+      background: var(--red-soft);
+      border-color: var(--red-border);
+      color: var(--red-text);
+    }
+
+    /* Find a manager --------------------------------------------------- */
+
+    .filters-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    @media (max-width: 700px) {
+      .filters-row { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    .results-list {
+      max-height: 260px;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border-soft);
+      background: var(--bg-card-soft);
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+    .manager-row {
+      padding: 6px 4px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .manager-row + .manager-row {
+      border-top: 1px solid #1f2230;
+    }
+    .manager-main { display: flex; flex-direction: column; gap: 2px; }
+    .manager-main strong { font-size: 13px; }
+    .manager-meta {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    /* Organigram --------------------------------------------------- */
+
+    .org-controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .org-tree-wrap {
+      max-height: 520px;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border-soft);
+      background: var(--bg-card-soft);
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .org-group {
+      border: 1px solid var(--border-soft);
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: #0f1118;
+      margin-bottom: 8px;
+    }
+
+    .org-group-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      border: 1px solid var(--border-soft);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #0f1118;
+      margin-bottom: 8px;
+    }
+
+    .org-group-label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 200px;
+    }
+
+    .org-group-label strong {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 13px;
+    }
+
+    .org-group-label span {
+      color: var(--text-soft);
+      font-size: 12px;
+    }
+
+    .org-group-list {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .org-group-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    .org-group-title {
+      font-size: 13px;
+      color: var(--text-main);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    .org-group-meta {
+      color: var(--text-soft);
+      font-size: 12px;
+      flex: 1;
+      padding-left: 8px;
+    }
+
+    .org-group-actions { display: flex; gap: 6px; align-items: center; }
+
+    .org-tree-detail {
+      margin-top: 10px;
+      padding: 12px;
+      border: 1px dashed var(--border-soft);
+      border-radius: 14px;
+      background: #0d0f17;
+    }
+
+    .org-level-row {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      justify-content: center;
+
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    .org-level-row::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .org-level-row::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .org-level-row::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+    }
+
+    .org-card {
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: #141824;
+      border: 1px solid var(--border-soft);
+      min-width: 160px;
+      text-align: center;
+    }
+
+    .org-person-card.org-highlight-manager {
+      box-shadow: 0 0 0 4px #ffd500;
+      transform: scale(1.03);
+      z-index: 2;
+    }
+
+    .org-person-card.org-highlight-report {
+      box-shadow: 0 0 0 3px #ffd500;
+      z-index: 1;
+    }
+
+    .org-name { font-weight: 700; font-size: 13px; }
+    .org-meta { color: var(--text-soft); font-size: 12px; margin-top: 2px; }
+    .org-cap { margin-top: 6px; display: flex; justify-content: center; }
+
+    .org-node-card {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 12px;
+      border: 1px solid #262a35;
+      background: #111420;
+    }
+
+    .org-node-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 12px;
+      border: 1px solid #262a35;
+      background: #111420;
+    }
+
+    .org-person {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #141824;
+      border: 1px solid #262a35;
+    }
+    .org-person-name { font-size: 12px; }
+    .org-person-role {
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">gleeds</div>
+      <div class="brand-title">Infrastructure Cost Management Line Management</div>
+    </div>
+    <div class="top-actions">
+      <button class="btn-top" id="btnLoad">Load CSV/XLSX…</button>
+      <button class="btn-top" id="btnExport">Export CSV</button>
+      <button class="btn-top" id="btnClear">Clear stored data</button>
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display:none;">
+    </div>
+  </header>
+
+  <div class="tabs-row">
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="organigram">Organigram</button>
+  </div>
+
+  <!-- OVERVIEW TAB -------------------------------------------------- -->
+  <section id="tab-overview" class="tab-panel active">
+    <div class="shell-overview">
+      <div class="stack">
+        <div class="card">
+          <div class="pill-label">Summary</div>
+          <div class="summary-line" id="summaryLine">
+            <span class="label">People:</span> <span class="value">0</span>
+            <span class="dot">•</span>
+            <span class="label">Managers:</span> <span class="value">0</span>
+            <span class="dot">•</span>
+            <span class="label">Top-level:</span> <span class="value">0</span>
+          </div>
+          <div class="summary-badges" id="summaryBadges">
+            <div class="summary-badge"><span>Under capacity</span> <strong>0</strong></div>
+            <div class="summary-badge"><span>At capacity</span> <strong>0</strong></div>
+            <div class="summary-badge"><span>Over capacity</span> <strong>0</strong></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div class="pill-label">People</div>
+            <div class="field" style="margin:0;width:200px;">
+              <div class="field-label">Quick search</div>
+              <input type="text" id="peopleSearch" placeholder="Name, office, region…">
+            </div>
+          </div>
+          <div class="people-table-wrap">
+            <table id="peopleTable">
+              <thead><tr id="peopleHeadRow"></tr></thead>
+              <tbody id="peopleBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="pill-label">Find a line manager</div>
+          <div class="filters-row">
+            <div class="field">
+              <div class="field-label">Region</div>
+              <select id="fmRegion"></select>
+            </div>
+            <div class="field">
+              <div class="field-label">Office</div>
+              <select id="filter-office">
+                <option value="Any">Any office</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="field-label">Grade (manager)</div>
+              <select id="fmGrade"></select>
+            </div>
+            <div class="field">
+              <div class="field-label">Minimum free capacity</div>
+              <input type="number" id="fmFreeCap" min="0" value="1">
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:6px;">
+            <button class="btn" id="fmSearchBtn" disabled>Suggest</button>
+            <button class="btn btn-ghost" id="fmClearBtn" disabled style="margin-left:6px;">Clear</button>
+          </div>
+          <div class="results-list" id="fmResults">
+            <div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>
+          </div>
+        </div>
+
+        <div class="card" id="manager-capacity-panel">
+          <div class="pill-label">Line managers by region</div>
+          <div class="field">
+            <div class="field-label">Region</div>
+            <select id="capacity-region">
+              <option value="Any">Any region</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-label">Office</div>
+            <select id="capacity-office">
+              <option value="Any">Any office</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-label">Capacity status</div>
+            <select id="capacity-status">
+              <option value="any">Any</option>
+              <option value="under">Under capacity</option>
+              <option value="full">At capacity</option>
+              <option value="over">Over capacity</option>
+            </select>
+          </div>
+          <div class="field" style="display:flex;gap:6px;">
+            <button class="btn" id="capacity-search">Search</button>
+            <button class="btn btn-ghost" id="capacity-clear">Clear</button>
+          </div>
+          <div id="capacity-results" class="results-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ORGANIGRAM TAB ------------------------------------------------ -->
+  <section id="tab-organigram" class="tab-panel">
+    <div class="card">
+      <div class="pill-label">Organigram</div>
+      <div class="org-controls">
+        <div class="field" style="flex:1;min-width:160px;margin-bottom:0;">
+          <div class="field-label">Group by</div>
+          <select id="orgGroupBy">
+            <option value="overall">Overall</option>
+            <option value="region" selected>Region</option>
+            <option value="office">Office</option>
+          </select>
+        </div>
+        <div class="org-group-actions">
+          <button class="btn" id="orgBuildBtn" disabled>Build organigram</button>
+          <button class="btn" id="exportPptBtn" disabled>Export PPT</button>
+        </div>
+      </div>
+      <div class="org-tree-wrap">
+        <div id="orgTreeRoot" class="org-tree">
+          <div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script>
+(function(){
+  // --- Canonical columns / aliases ---------------------------------------
+  const ALIAS = {
+    Surname: ['Surname','Last Name','LastName','Family Name'],
+    FirstForename: ['First Forename','FirstForename','First Name','FirstName','Forename'],
+    CostCentre: ['Cost Centre','CostCentre','Cost centre'],
+    Grade: ['Grade'],
+    GradeLevel: ['Grade Level','GradeLevel','Level','Band'],
+    Discipline: ['Discipline','Function','Department','Practice'],
+    Office: ['Office','Office/Location','Location','Base Office'],
+    Region: ['Region','Area','Region/Area','Geography','Territory'],
+    Area: ['Area','Sub Region','Sub-Region','Subregion'],
+    Technical: ['Technical','Technical/Operational'],
+    DirectorName: ['Director Name','Director','Line Director'],
+    Manager: ['Manager','Line Manager','Reporting Manager','Reports To','Manager Name'],
+    Appraiser: ['Appraiser','Reviewer'],
+    ExpenseApprover: ['Expense Approver','Expenses Approver','ExpenseApprover'],
+    IsManager: ['Is Manager','IsManager','Manager?'],
+    IsDirector: ['Is Director','IsDirector','Director?'],
+    IsAppraiser: ['Is Appraiser','IsAppraiser','Appraiser?'],
+    Capacity: ['Capacity','Line Capacity','line_capacity']
+  };
+
+  const state = {
+    rawObjects: [],
+    people: [],
+    managersByName: new Map(),
+    orgTreesByGroup: {},
+  };
+
+  const GRADE_ORDER = [
+    'Senior Director',
+    'Director',
+    'Project Director',
+    'Associate Director',
+    'Executive Cost Manager',
+    'Senior Cost Manager',
+    'Cost Manager',
+    'Assistant Cost Manager',
+    'Graduate Cost Manager',
+    'Trainee Cost Manager'
+  ];
+
+  // --- Utility ------------------------------------------------------------
+  function norm(s){ return (s||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,''); }
+  function swapCommaName(name){
+    if (!name) return '';
+    const parts = name.split(',').map(p=>p.trim()).filter(Boolean);
+    if (parts.length === 2){
+      return `${parts[1]} ${parts[0]}`;
+    }
+    return name.replace(/\s+/g,' ');
+  }
+  function canonicalKey(value){
+    const base = swapCommaName((value||'').toString().normalize('NFKD').replace(/[\u0300-\u036f]/g,''));
+    return base.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  }
+
+  function tidyLabel(value){
+    return (value||'').toString().replace(/\s+/g,' ').trim();
+  }
+
+  function gradeForCapacity(value){
+    const clean = tidyLabel(value);
+    const lower = clean.toLowerCase();
+    // Treat bare Cost Manager / Quantity Surveyor roles as Professional for
+    // capacity defaults while leaving the displayed grade untouched.
+    if (lower === 'cost manager' || lower === 'quantity surveyor'){
+      return 'Professional';
+    }
+    return clean;
+  }
+
+  function buildKeyMap(firstRow){
+    const keys = Object.keys(firstRow || {});
+    const keysNorm = keys.map(k=>norm(k));
+    const map = {};
+    for (const [canon, aliases] of Object.entries(ALIAS)){
+      const candidates = [canon, ...aliases];
+      const normCands = candidates.map(c=>norm(c));
+      let hit = null;
+      hit = keys.find(k => candidates.includes(k));
+      if (!hit){
+        const idx = keysNorm.findIndex(k => normCands.includes(k));
+        if (idx >= 0) hit = keys[idx];
+      }
+      if (hit) map[canon] = hit;
+    }
+    return map;
+  }
+
+  function getVal(map, row, canon){
+    const actual = map[canon];
+    return actual ? (row[actual] ?? '') : '';
+  }
+
+  function toBool(v){
+    const t = (v||'').toString().trim().toLowerCase();
+    return t === 'y' || t === 'yes' || t === 'true' || t === '1';
+  }
+
+  function toNum(v){
+    const n = parseFloat((v||'').toString().replace(',','.'));
+    return isNaN(n) ? 0 : n;
+  }
+
+  function capacityDelta(person) {
+    const cap = Number(person.Capacity || 0);
+    const used = Number(person.currentReports || 0);
+    return used - cap; // > 0 over capacity, < 0 under, 0 at
+  }
+
+  function freeCapacity(person) {
+    const cap = Number(person.Capacity || 0);
+    const used = Number(person.currentReports || 0);
+    return cap - used; // > 0 free, < 0 over, 0 at
+  }
+
+  function getOfficesForRegion(region) {
+    const offices = new Set();
+    (state.people || []).forEach(p => {
+      if (!p.Office) return;
+      if (region === 'Any' || (p.Region || '') === region) {
+        offices.add(p.Office);
+      }
+    });
+    return Array.from(offices).sort();
+  }
+
+  function populateOfficeSelect(selectEl, region) {
+    if (!selectEl) return;
+    const offices = getOfficesForRegion(region);
+    let html = '<option value="Any">Any office</option>';
+    offices.forEach(office => {
+      html += `<option value="${office}">${office}</option>`;
+    });
+    selectEl.innerHTML = html;
+  }
+
+  function capacityMeta(p){
+    const used = p.currentReports || 0;
+    const cap = p.Capacity || 0;
+    const status = p.capStatus || 'full';
+    const cls = status==='under' ? 'cap-chip cap-under'
+              : status==='full' ? 'cap-chip cap-full'
+              : 'cap-chip cap-over';
+    const label = status==='under' ? 'Under'
+                : status==='full' ? 'At'
+                : 'Over';
+    return {used, cap, cls, label};
+  }
+
+  function capacityChip(p, {showIfNonManager=false}={}){
+    if (!p) return '';
+    const isMgr = p.IsManager || p.currentReports>0;
+    if (!showIfNonManager && !isMgr) return `${p.Capacity || 0}`;
+    const meta = capacityMeta(p);
+    return `<span class="${meta.cls}"><span>${meta.label}</span><strong>• ${meta.used} / ${meta.cap}</strong></span>`;
+  }
+
+  // --- CSV / XLSX parsing -------------------------------------------------
+  function detectDelimiter(sample){
+    const cands = [',',';','\t','|'];
+    const counts = {',':0,';':0,'\t':0,'|':0};
+    let inq=false;
+    for (let i=0;i<sample.length;i++){
+      const ch=sample[i];
+      if(ch=='"'){
+        if(sample[i+1]=='"'){i++;continue;}
+        inq=!inq;
+      } else if(!inq && counts.hasOwnProperty(ch)){
+        counts[ch]++;
+      }
+    }
+    let best=',',bestN=-1;
+    for(const d of cands){ if(counts[d]>bestN){bestN=counts[d];best=d;} }
+    return best;
+  }
+
+  function parseCSVAuto(text){
+    if (!text) return [];
+    text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    const delim = detectDelimiter(text.slice(0,2000));
+    const rows=[]; let row=[], val='', i=0, inq=false;
+    while(i<text.length){
+      const ch=text[i];
+      if(inq){
+        if(ch=='"'){
+          if(text[i+1]=='"'){val+='"';i+=2;continue;}
+          inq=false;i++;continue;
+        }
+        val+=ch;i++;continue;
+      } else {
+        if(ch=='"'){inq=true;i++;continue;}
+        if(ch===delim){row.push(val);val='';i++;continue;}
+        if(ch=='\n'){row.push(val);rows.push(row);row=[];val='';i++;continue;}
+        val+=ch;i++;continue;
+      }
+    }
+    row.push(val); rows.push(row);
+    if(rows.length && rows[rows.length-1].every(c=>!String(c||'').trim())) rows.pop();
+    return rows;
+  }
+
+  function rowsToObjects(rows){
+    if (!rows.length) return [];
+    while(rows.length && rows[0].every(c=>!String(c||'').trim())) rows.shift();
+    if (!rows.length) return [];
+    const heads = rows[0].map(h=>{
+      const clean = (h||'').replace(/^\ufeff/,'');
+      return clean.trim();
+    });
+    return rows.slice(1).map(r=>{
+      const o={};
+      heads.forEach((h,idx)=>{ o[h] = (r[idx] ?? ''); });
+      return o;
+    });
+  }
+
+  function xlsxToObjects(buf){
+    const wb = XLSX.read(buf,{type:'array'});
+    const sheetName = wb.SheetNames[0];
+    const sheet = wb.Sheets[sheetName];
+    return XLSX.utils.sheet_to_json(sheet, {defval:'', raw:false});
+  }
+
+  function handleFile(file){
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    const reader = new FileReader();
+    reader.onload = e=>{
+      const buf = e.target.result;
+      const u8 = new Uint8Array(buf);
+      const looksZip = u8.length>=2 && u8[0]===0x50 && u8[1]===0x4b;
+      try{
+        let objs=[];
+        if (looksZip || name.endsWith('.xlsx') || name.endsWith('.xls')){
+          objs = xlsxToObjects(buf);
+        } else {
+          let text = new TextDecoder('utf-8',{fatal:false}).decode(buf);
+          let rows = parseCSVAuto(text);
+          objs = rowsToObjects(rows);
+          if (!objs.length){
+            const text2 = new TextDecoder('utf-16le',{fatal:false}).decode(buf);
+            rows = parseCSVAuto(text2);
+            objs = rowsToObjects(rows);
+          }
+        }
+        processObjects(objs);
+      }catch(err){
+        console.error(err);
+        alert('Could not read file. Please save as CSV (UTF-8) or XLSX and try again.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // --- Capacity by grade rules -------------------------------------------
+  function gradeDefaultCapacity(grade, gradeLevel){
+    const s = ((grade || '') + ' ' + (gradeLevel || '')).toLowerCase();
+    let cap = 0;
+    if (s.includes('senior director')) cap = 10;
+    else if (s.includes('project director')) cap = 8;
+    else if (s.includes('associate')) cap = 6;      // Associate Director
+    else if (s.includes('director')) cap = 10;      // plain Director
+    else if (s.includes('executive')) cap = 5;      // Executive Cost Manager
+    else if (s.includes('senior')) cap = 4;         // Senior Cost Manager
+    else if (s.includes('professional')) cap = 3;   // Professional Cost Manager
+    else if (s.includes('assistant')) cap = 2;      // Assistant Cost Manager
+    return cap;
+  }
+
+  // --- Process into canonical people -------------------------------------
+  function processObjects(objs){
+    if (!objs || !objs.length){
+      state.rawObjects = [];
+      state.people = [];
+      renderAll();
+      return;
+    }
+    const keyMap = buildKeyMap(objs[0]);
+    const people = objs.map((row, idx)=>{
+      const p = {};
+      p.id = 'p'+(idx+1);
+      p.Surname = tidyLabel(getVal(keyMap,row,'Surname'));
+      p.FirstForename = tidyLabel(getVal(keyMap,row,'FirstForename'));
+      p.CostCentre = tidyLabel(getVal(keyMap,row,'CostCentre'));
+      const gradeRaw = tidyLabel(getVal(keyMap,row,'Grade'));
+      p.Grade = gradeRaw; // Preserve uploaded grade for display
+      p.GradeLevel = tidyLabel(getVal(keyMap,row,'GradeLevel'));
+      p.Discipline = tidyLabel(getVal(keyMap,row,'Discipline'));
+      p.Office = tidyLabel(getVal(keyMap,row,'Office'));
+      p.Region = tidyLabel(getVal(keyMap,row,'Region'));
+      p.Area = tidyLabel(getVal(keyMap,row,'Area'));
+      p.Technical = tidyLabel(getVal(keyMap,row,'Technical'));
+      p.DirectorName = tidyLabel(getVal(keyMap,row,'DirectorName'));
+      p.Manager = tidyLabel(getVal(keyMap,row,'Manager'));
+      p.Appraiser = tidyLabel(getVal(keyMap,row,'Appraiser'));
+      p.ExpenseApprover = tidyLabel(getVal(keyMap,row,'ExpenseApprover'));
+      p.IsManager = toBool(getVal(keyMap,row,'IsManager'));
+      p.IsDirector = toBool(getVal(keyMap,row,'IsDirector'));
+      p.IsAppraiser = toBool(getVal(keyMap,row,'IsAppraiser'));
+      p.Capacity = toNum(getVal(keyMap,row,'Capacity'));
+      // apply grade rules if capacity not set or zero
+      if (!p.Capacity || p.Capacity <= 0){
+        const gradeForCap = gradeForCapacity(p.Grade);
+        p.Capacity = gradeDefaultCapacity(gradeForCap, p.GradeLevel);
+      }
+      p.FullName = (p.FirstForename + ' ' + p.Surname).trim();
+      p.fullNameKey = canonicalKey(p.FullName);
+      p.managerKey = canonicalKey(p.Manager);
+      return p;
+    });
+
+    const byName = new Map();
+    people.forEach(p=>{ if (p.fullNameKey) byName.set(p.fullNameKey, p); });
+    people.forEach(p=>{ p.currentReports = 0; });
+    people.forEach(p=>{
+      const mgr = p.managerKey;
+      if (!mgr) return;
+      const m = byName.get(mgr);
+      if (m) m.currentReports++;
+    });
+
+    people.forEach(p=>{
+      const cap = p.Capacity || 0;
+      const used = p.currentReports || 0;
+      const free = cap - used;
+      p.freeSlots = free;
+      if (cap === 0){
+        if (used>0)      p.capStatus = 'over';
+        else             p.capStatus = 'full';
+      } else if (used < cap){
+        p.capStatus = 'under';
+      } else if (used === cap){
+        p.capStatus = 'full';
+      } else {
+        p.capStatus = 'over';
+      }
+    });
+
+    state.rawObjects = objs;
+    state.people = people;
+    state.managersByName = byName;
+    renderAll();
+  }
+
+  // --- Summary -----------------------------------------------------------
+  function renderSummary(){
+    const line = document.getElementById('summaryLine');
+    const badges = document.getElementById('summaryBadges');
+    const people = state.people || [];
+    const total = people.length;
+    const managerList = people.filter(p=>p.IsManager || p.currentReports>0);
+    const managers = managerList.length;
+    const top = people.filter(p=>!p.Manager || !p.Manager.toString().trim()).length;
+    const under = managerList.filter(p=>p.capStatus==='under').length;
+    const full = managerList.filter(p=>p.capStatus==='full').length;
+    const over = managerList.filter(p=>p.capStatus==='over').length;
+
+    line.innerHTML = `
+      <span class="label">People:</span> <span class="value">${total}</span>
+      <span class="dot">•</span>
+      <span class="label">Managers:</span> <span class="value">${managers}</span>
+      <span class="dot">•</span>
+      <span class="label">Top-level:</span> <span class="value">${top}</span>
+    `;
+    badges.innerHTML = `
+      <div class="summary-badge"><span>Under capacity</span> <strong>${under}</strong></div>
+      <div class="summary-badge"><span>At capacity</span> <strong>${full}</strong></div>
+      <div class="summary-badge"><span>Over capacity</span> <strong>${over}</strong></div>
+    `;
+  }
+
+  // --- People table ------------------------------------------------------
+  const peopleHeadRow = document.getElementById('peopleHeadRow');
+  const peopleBody = document.getElementById('peopleBody');
+  const peopleSearch = document.getElementById('peopleSearch');
+
+  function renderPeopleTable(){
+    const people = state.people || [];
+    const displayCols = [
+      'FullName','Grade','GradeLevel','Discipline','Office',
+      'Region','Area','DirectorName','Manager','IsManager','Capacity','currentReports'
+    ];
+    const headers = {
+      FullName:'Name',
+      Grade:'Grade',
+      GradeLevel:'Grade level',
+      Discipline:'Discipline',
+      Office:'Office',
+      Region:'Region',
+      Area:'Area',
+      DirectorName:'Director',
+      Manager:'Manager',
+      IsManager:'Is manager',
+      Capacity:'Capacity',
+      currentReports:'Reports'
+    };
+    peopleHeadRow.innerHTML = displayCols.map(c=>`<th>${headers[c]||c}</th>`).join('');
+    const query = (peopleSearch.value||'').toString().trim().toLowerCase();
+    const filtered = !query ? people : people.filter(p=>{
+      const hay = [
+        p.FullName,p.Grade,p.GradeLevel,p.Discipline,
+        p.Office,p.Region,p.Area,p.Manager,p.DirectorName
+      ].join(' ').toLowerCase();
+      return hay.includes(query);
+    });
+
+    if (!filtered.length){
+      peopleBody.innerHTML = `<tr><td colspan="${displayCols.length}" class="subtle">${people.length ? 'No matches for that search.' : 'Upload a CSV/XLSX to see people here.'}</td></tr>`;
+      return;
+    }
+
+    peopleBody.innerHTML = filtered.map(p=>{
+      return `
+        <tr>
+          <td>${p.FullName || ''}</td>
+          <td>${p.Grade || ''}</td>
+          <td>${p.GradeLevel || ''}</td>
+          <td>${p.Discipline || ''}</td>
+          <td>${p.Office || ''}</td>
+          <td>${p.Region || ''}</td>
+          <td>${p.Area || ''}</td>
+          <td>${p.DirectorName || ''}</td>
+          <td>${p.Manager || ''}</td>
+          <td>${p.IsManager || p.currentReports>0 ? 'Y' : 'N'}</td>
+          <td>${capacityChip(p)}</td>
+          <td>${p.currentReports}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  peopleSearch.addEventListener('input', renderPeopleTable);
+
+  // --- Find a manager ----------------------------------------------------
+  const fmRegion = document.getElementById('fmRegion');
+  const filterOfficeSelect = document.getElementById('filter-office');
+  const fmGrade = document.getElementById('fmGrade');
+  const fmFreeCap = document.getElementById('fmFreeCap');
+  const fmSearchBtn = document.getElementById('fmSearchBtn');
+  const fmClearBtn = document.getElementById('fmClearBtn');
+  const fmResults = document.getElementById('fmResults');
+
+  function uniq(arr){ return Array.from(new Set(arr.filter(Boolean))).sort((a,b)=>a.localeCompare(b)); }
+  function fillSelect(sel, items){
+    sel.innerHTML = '<option value="">Any</option>' + items.map(v=>`<option>${v}</option>`).join('');
+  }
+
+  function fillFilterOptions(){
+    const people = state.people || [];
+    fillSelect(fmRegion, uniq(people.map(p=>p.Region)));
+    populateOfficeSelect(filterOfficeSelect, (fmRegion && fmRegion.value) || 'Any');
+    fillSelect(fmGrade, uniq(people.map(p=>p.Grade)));
+    const hasData = people.length>0;
+    fmSearchBtn.disabled = !hasData;
+    fmClearBtn.disabled = !hasData;
+  }
+
+  function renderFindManagerResults(list){
+    if (!list.length){
+      fmResults.innerHTML = '<div class="subtle">No managers match those filters.</div>';
+      return;
+    }
+    fmResults.innerHTML = list.map(p=>{
+      return `
+        <div class="manager-row">
+          <div class="manager-main">
+            <strong>${p.FullName}</strong>
+            <div class="manager-meta">
+              <span>${p.Grade || ''}</span>
+              ${p.Discipline ? `<span>${p.Discipline}</span>` : ''}
+              ${p.Office ? `<span>${p.Office}</span>` : ''}
+              ${p.Region ? `<span>${p.Region}</span>` : ''}
+            </div>
+          </div>
+          ${capacityChip(p,{showIfNonManager:true})}
+        </div>
+      `;
+    }).join('');
+  }
+
+  if (fmRegion){
+    fmRegion.addEventListener('change', ()=>{
+      const region = fmRegion.value || 'Any';
+      populateOfficeSelect(filterOfficeSelect, region);
+      if (filterOfficeSelect) filterOfficeSelect.value = 'Any';
+    });
+  }
+
+  fmSearchBtn.addEventListener('click', ()=>{
+    const people = state.people || [];
+    const reg = fmRegion.value;
+    const office = filterOfficeSelect ? filterOfficeSelect.value : 'Any';
+    const grade = fmGrade.value;
+    const minFree = parseInt(fmFreeCap.value || '0', 10);
+    const candidates = people.filter(p=>{
+      const isManager = p.IsManager || p.currentReports>0;
+      if (!isManager) return false;
+      if (reg && p.Region !== reg) return false;
+      if (office && office !== 'Any' && (p.Office || '') !== office) return false;
+      if (grade && p.Grade !== grade) return false;
+      if ((p.freeSlots || 0) < minFree) return false;
+      return true;
+    }).sort((a,b)=>{
+      const freeDiff = (b.freeSlots||0) - (a.freeSlots||0);
+      if (freeDiff !== 0) return freeDiff;
+      return a.FullName.localeCompare(b.FullName);
+    });
+    renderFindManagerResults(candidates);
+  });
+
+  fmClearBtn.addEventListener('click', ()=>{
+    fmRegion.value = '';
+    populateOfficeSelect(filterOfficeSelect, 'Any');
+    if (filterOfficeSelect) filterOfficeSelect.value = 'Any';
+    fmGrade.value = '';
+    fmFreeCap.value = 1;
+    fmResults.innerHTML = '<div class="subtle">Cleared. Set filters and click <strong>Suggest</strong>.</div>';
+  });
+
+  // --- Line managers by region -------------------------------------------
+  const capacityRegionSelect = document.getElementById('capacity-region');
+  const capacityOfficeSelect = document.getElementById('capacity-office');
+  const capacityStatusSelect = document.getElementById('capacity-status');
+  const capacityResults = document.getElementById('capacity-results');
+  const capacitySearchBtn = document.getElementById('capacity-search');
+  const capacityClearBtn = document.getElementById('capacity-clear');
+
+  function populateCapacityRegions(){
+    if (!capacityRegionSelect) return;
+    capacityRegionSelect.innerHTML = '<option value="Any">Any region</option>';
+    const regions = new Set();
+    (state.people || []).forEach(p=>{ if (p.Region) regions.add(p.Region); });
+    Array.from(regions).sort().forEach(region=>{
+      const opt = document.createElement('option');
+      opt.value = region;
+      opt.textContent = region;
+      capacityRegionSelect.appendChild(opt);
+    });
+  }
+
+  function updateCapacityResults(){
+    if (!capacityResults) return;
+
+    const regionFilter = capacityRegionSelect ? capacityRegionSelect.value : 'Any';
+    const statusFilter = capacityStatusSelect ? capacityStatusSelect.value : 'any';
+    const officeFilter = capacityOfficeSelect ? capacityOfficeSelect.value : 'Any';
+
+    const managers = (state.people || []).filter(p => p.IsManager);
+
+    const filtered = managers.filter(p => {
+      const regionOk = regionFilter === 'Any' || (p.Region || '') === regionFilter;
+      const officeOk = officeFilter === 'Any' || (p.Office || '') === officeFilter;
+      const statusOk = statusFilter === 'any' || (p.capStatus || '').toLowerCase() === statusFilter;
+      return regionOk && officeOk && statusOk;
+    });
+
+    filtered.sort((a, b) => {
+      const status = statusFilter;
+
+      if (status === 'over') {
+        const deltaA = capacityDelta(a);
+        const deltaB = capacityDelta(b);
+        if (deltaA !== deltaB) return deltaB - deltaA;
+      } else {
+        const freeA = freeCapacity(a);
+        const freeB = freeCapacity(b);
+        if (freeA !== freeB) return freeB - freeA;
+      }
+
+      const regionCompare = (a.Region || '').localeCompare(b.Region || '');
+      if (regionCompare !== 0) return regionCompare;
+
+      return (a.FullName || a.Name || '').localeCompare(b.FullName || b.Name || '');
+    });
+
+    capacityResults.innerHTML = '';
+
+    if (!filtered.length){
+      capacityResults.innerHTML = '<p class="muted">No managers match these filters.</p>';
+      return;
+    }
+
+    filtered.forEach(p => {
+      const status = (p.capStatus || '').toLowerCase();
+      const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
+      const row = document.createElement('div');
+      row.className = 'manager-row';
+      row.innerHTML = `
+        <div class="manager-main">
+          <strong>${p.FullName || p.Name}</strong>
+          <span>${p.Grade || ''}</span>
+          <span>${p.Office || ''}</span>
+          <span>${p.Region || ''}</span>
+        </div>
+        <div class="manager-cap">
+          <span class="cap-chip ${status === 'over' ? 'cap-over' : status === 'full' ? 'cap-full' : 'cap-under'}">
+            <span>${statusLabel}</span><strong>${p.currentReports || 0}/${p.Capacity || 0}</strong>
+          </span>
+        </div>
+      `;
+      capacityResults.appendChild(row);
+    });
+  }
+
+  if (capacitySearchBtn){
+    capacitySearchBtn.addEventListener('click', updateCapacityResults);
+  }
+  if (capacityClearBtn){
+    capacityClearBtn.addEventListener('click', ()=>{
+      if (capacityRegionSelect) capacityRegionSelect.value = 'Any';
+      populateOfficeSelect(capacityOfficeSelect, 'Any');
+      if (capacityOfficeSelect) capacityOfficeSelect.value = 'Any';
+      if (capacityStatusSelect) capacityStatusSelect.value = 'any';
+      if (capacityResults) capacityResults.innerHTML = '';
+    });
+  }
+
+  if (capacityRegionSelect){
+    capacityRegionSelect.addEventListener('change', ()=>{
+      const region = capacityRegionSelect.value || 'Any';
+      populateOfficeSelect(capacityOfficeSelect, region);
+      if (capacityOfficeSelect) capacityOfficeSelect.value = 'Any';
+    });
+  }
+
+  // --- Organigram --------------------------------------------------------
+  const orgGroupBy = document.getElementById('orgGroupBy');
+  const orgBuildBtn = document.getElementById('orgBuildBtn');
+  const orgTreeRoot = document.getElementById('orgTreeRoot');
+  const exportPptBtn = document.getElementById('exportPptBtn');
+
+  // --- Helpers for the hierarchy view ---------------------------------------
+
+  function canonicalName(name) {
+    return (name || '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
+  }
+
+  function gradeIndex(grade) {
+    const idx = GRADE_ORDER.indexOf((grade || '').trim());
+    return idx === -1 ? GRADE_ORDER.length : idx;
+  }
+
+  function gradeDepthIndex(gradeName) {
+    if (!gradeName) return 99;
+
+    // Normalise case and spacing, and pad with spaces so
+    // patterns like " director " or " cost manager " don't
+    // accidentally match parts of other words.
+    const normalised = ` ${gradeName.toLowerCase().replace(/\s+/g, ' ').trim()} `;
+
+    // Rules are checked in this order. The FIRST match wins.
+    const rules = [
+      // Directors – specific first
+      { depth: 0, labels: ['senior director'] },
+      { depth: 2, labels: ['project director'] },
+      { depth: 3, labels: ['associate director'] },
+      { depth: 1, labels: [' director '] }, // plain "Director"
+
+      // Exec CM / QS
+      { depth: 4, labels: ['executive cost manager', 'executive quantity surveyor'] },
+
+      // Senior CM / QS
+      { depth: 5, labels: ['senior cost manager', 'senior quantity surveyor'] },
+
+      // Assistant / Graduate / Trainee CM / QS – specific before generic
+      { depth: 7, labels: ['assistant cost manager', 'assistant quantity surveyor'] },
+      { depth: 8, labels: ['graduate cost manager', 'graduate quantity surveyor'] },
+      { depth: 9, labels: ['trainee cost manager', 'trainee quantity surveyor'] },
+
+      // Generic Cost Manager / QS (checked last so it doesn't swallow the others)
+      { depth: 6, labels: [' cost manager ', ' quantity surveyor '] },
+    ];
+
+    for (let i = 0; i < rules.length; i++) {
+      const rule = rules[i];
+      for (let j = 0; j < rule.labels.length; j++) {
+        if (normalised.includes(rule.labels[j])) {
+          return rule.depth;
+        }
+      }
+    }
+
+    // Unknown / non-standard grades go to the bottom
+    return 99;
+  }
+
+  function getPersonNameKey(person) {
+    if (!person) return '';
+
+    const raw =
+      person.Name ||
+      person['Full name'] ||
+      person['Full Name'] ||
+      person['Employee'] ||
+      person['Employee name'] ||
+      person.name ||
+      '';
+
+    return canonicalName(raw);
+  }
+
+  function clearOrgHighlightsInGroup(groupRoot) {
+    if (!groupRoot) return;
+    const cards = groupRoot.querySelectorAll('.org-person-card');
+    cards.forEach(card => {
+      card.classList.remove('org-highlight-manager', 'org-highlight-report');
+    });
+  }
+
+  function onOrgPersonCardClick(evt) {
+    const card = evt.currentTarget;
+    const groupKey = card.dataset.groupKey;
+    const personKey = (card.dataset.personKey || '').toLowerCase();
+
+    console.log('Org card clicked:', { groupKey, personKey });
+
+    if (!groupKey || !personKey) return;
+    const treeInfo = state.orgTreesByGroup && state.orgTreesByGroup[groupKey];
+    if (!treeInfo) {
+      console.warn('No tree info for groupKey', groupKey);
+      return;
+    }
+
+    const node = treeInfo.nodeByName.get(personKey);
+    if (!node) {
+      console.warn('No node found for personKey', personKey);
+      return;
+    }
+
+    const groupRoot = document.querySelector(
+      `.org-group[data-group-key="${groupKey}"]`
+    );
+    if (!groupRoot) return;
+
+    groupRoot
+      .querySelectorAll(
+        '.org-person-card.org-highlight-manager, .org-person-card.org-highlight-report'
+      )
+      .forEach(el => el.classList.remove('org-highlight-manager', 'org-highlight-report'));
+
+    card.classList.add('org-highlight-manager');
+
+    (node.children || []).forEach(child => {
+      const cp = child.person || child.raw || {};
+      const childRaw =
+        cp.FullName ||
+        cp.Name ||
+        cp['Full name'] ||
+        cp['Full Name'] ||
+        cp['Employee name'] ||
+        cp['Employee'] ||
+        cp.name ||
+        '';
+      const childKey = canonicalName(childRaw);
+      if (!childKey) return;
+
+      const childCard = groupRoot.querySelector(
+        `.org-person-card[data-person-key="${childKey}"]`
+      );
+      if (childCard) {
+        childCard.classList.add('org-highlight-report');
+      }
+    });
+  }
+
+  function createOrgTreeCard(node, groupKey) {
+    const person = node.person;
+    const card = document.createElement('div');
+    card.className = 'org-card org-person-card';
+    card.style.cursor = 'pointer';
+
+    const rawName =
+      person.FullName ||
+      person.Name ||
+      person['Full name'] ||
+      person['Full Name'] ||
+      person['Employee'] ||
+      person['Employee name'] ||
+      person.name ||
+      '';
+    const personKey = node.personKey || canonicalName(rawName);
+    console.log('Org card personKey', rawName, '=>', personKey);
+    card.dataset.personKey = personKey || '';
+    if (groupKey) card.dataset.groupKey = groupKey;
+    card.addEventListener('click', onOrgPersonCardClick);
+
+    const status = (person.capStatus || '').toLowerCase();
+    const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
+    const capCls = status === 'over' ? 'cap-chip cap-over' : status === 'full' ? 'cap-chip cap-full' : 'cap-chip cap-under';
+
+    card.innerHTML = `
+      <div class="org-name">${person.FullName || person.Name || ''}</div>
+      <div class="org-meta">${[person.Grade || '', person.Office || ''].filter(Boolean).join(' • ')}</div>
+      <div class="org-cap">
+        <span class="${capCls}"><span>${statusLabel}</span><strong>${person.currentReports || 0}/${person.Capacity || 0}</strong></span>
+      </div>
+    `;
+
+    return card;
+  }
+
+  function buildOrganigramGroups(){
+    const mode = orgGroupBy ? orgGroupBy.value : 'region';
+    const people = state.people || [];
+    const groups = new Map();
+
+    if (mode === 'overall') {
+      const key = 'overall';
+      groups.set(key, { key, label: 'All people', people: people.slice() });
+    } else if (mode === 'region') {
+      people.forEach(p => {
+        const key = p.Region || 'Unspecified';
+        if (!groups.has(key)) groups.set(key, { key, label: key, people: [] });
+        groups.get(key).people.push(p);
+      });
+    } else if (mode === 'office') {
+      people.forEach(p => {
+        const key = p.Office || 'Unspecified';
+        if (!groups.has(key)) groups.set(key, { key, label: key, people: [] });
+        groups.get(key).people.push(p);
+      });
+    }
+
+    return Array.from(groups.values()).sort((a,b)=> a.label.localeCompare(b.label));
+  }
+
+  function buildHierarchyForGroup(groupPeople){
+    const nodes = groupPeople.map(p => ({
+      person: p,
+      key: canonicalName(p.FullName || p.Name),
+      managerKey: canonicalName(p.Manager),
+      children: [],
+      depth: 0,
+    }));
+
+    const byKey = new Map();
+    nodes.forEach(n => { if (n.key) byKey.set(n.key, n); });
+
+    nodes.forEach(node => {
+      const mgr = node.managerKey && byKey.get(node.managerKey);
+      if (mgr && mgr !== node) mgr.children.push(node);
+    });
+
+    const roots = nodes.filter(node => {
+      const mgr = node.managerKey && byKey.get(node.managerKey);
+      return !mgr || mgr === node;
+    });
+
+    const queue = [];
+    const visited = new Set();
+    roots.forEach(root => { root.depth = 0; queue.push(root); visited.add(root); });
+
+    while(queue.length){
+      const current = queue.shift();
+      current.children.forEach(child => {
+        if (!visited.has(child)){
+          child.depth = current.depth + 1;
+          visited.add(child);
+          queue.push(child);
+        }
+      });
+    }
+
+    nodes.forEach(node => {
+      if (!visited.has(node)){
+        node.depth = 0;
+        roots.push(node);
+      }
+    });
+
+    nodes.forEach(node => {
+      node.depth = gradeDepthIndex(node.person.Grade || node.person.GradeLevel || '');
+    });
+
+    return { nodes, roots };
+  }
+
+  function renderOrgTree(groupKey){
+    const detail = document.getElementById('org-tree-detail');
+    if (!detail) return;
+
+    const groups = buildOrganigramGroups();
+    const group = groups.find(g => g.key === groupKey);
+    if (!group){
+      detail.innerHTML = '<p class="subtle">No data for this group.</p>';
+      return;
+    }
+
+    const { nodes, roots } = buildHierarchyForGroup(group.people);
+
+    const nodeByName = new Map();
+    nodes.forEach(node => {
+      const person = node.person || node.raw || {};
+      const rawName =
+        person.FullName ||
+        person.Name ||
+        person['Full name'] ||
+        person['Full Name'] ||
+        person['Employee'] ||
+        person['Employee name'] ||
+        person.name ||
+        '';
+
+      const key = canonicalName(rawName);
+      if (key) {
+        nodeByName.set(key, node);
+        node.personKey = key;
+      }
+    });
+
+    if (!window.state) window.state = {};
+    if (!state.orgTreesByGroup) state.orgTreesByGroup = {};
+    state.orgTreesByGroup[groupKey] = { nodes, roots, nodeByName };
+
+    const levels = new Map();
+    let maxDepth = 0;
+    nodes.forEach(n => {
+      const d = n.depth || 0;
+      if (!levels.has(d)) levels.set(d, []);
+      levels.get(d).push(n);
+      if (d > maxDepth) maxDepth = d;
+    });
+
+    levels.forEach(levelNodes => {
+      levelNodes.sort((a,b)=>{
+        const ga = gradeIndex(a.person.Grade);
+        const gb = gradeIndex(b.person.Grade);
+        if (ga !== gb) return ga - gb;
+        return (a.person.FullName || a.person.Name || '').localeCompare(b.person.FullName || b.person.Name || '');
+      });
+    });
+
+    detail.innerHTML = '';
+    const title = document.createElement('h3');
+    title.textContent = `${group.label} – Hierarchy`;
+    detail.appendChild(title);
+
+    if (!nodes.length){
+      detail.innerHTML += '<div class="subtle">No people in this group.</div>';
+      return;
+    }
+
+    const groupContainer = document.createElement('div');
+    groupContainer.className = 'org-group org-tree';
+    groupContainer.setAttribute('data-group-key', groupKey);
+
+    for (let depth = 0; depth <= maxDepth; depth++){
+      const levelNodes = levels.get(depth) || [];
+      if (!levelNodes.length) continue;
+      const row = document.createElement('div');
+      row.className = 'org-level-row';
+      levelNodes.forEach(node => {
+        row.appendChild(createOrgTreeCard(node, groupKey));
+      });
+      groupContainer.appendChild(row);
+    }
+
+    detail.appendChild(groupContainer);
+    console.log('Organigram tree', group.label, 'nodes:', nodes.length, 'expected:', group.people.length);
+  }
+
+  function renderOrganigram(){
+    const people = state.people || [];
+    if (!people.length){
+      orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>';
+      return;
+    }
+
+    state.orgTreesByGroup = {};
+
+    const groups = buildOrganigramGroups();
+    orgTreeRoot.innerHTML = '';
+
+    const listContainer = document.createElement('div');
+    listContainer.id = 'org-group-list';
+
+    groups.forEach(group => {
+      const managers = group.people.filter(p => p.IsManager || p.currentReports > 0);
+      const row = document.createElement('div');
+      row.className = 'org-group-row';
+      row.innerHTML = `
+        <div class="org-group-label">
+          <strong>${group.label}</strong>
+          <span>${group.people.length} people • ${managers.length} managers</span>
+        </div>
+        <div class="org-group-actions">
+          <button class="btn btn-ghost org-view-tree" data-group="${group.key}">View tree</button>
+        </div>
+      `;
+      listContainer.appendChild(row);
+    });
+
+    orgTreeRoot.appendChild(listContainer);
+
+    const detail = document.createElement('div');
+    detail.id = 'org-tree-detail';
+    detail.className = 'org-tree-detail';
+    detail.innerHTML = '<div class="subtle">Select a group to view its hierarchy.</div>';
+    orgTreeRoot.appendChild(detail);
+
+    listContainer.addEventListener('click', e => {
+      const btn = e.target.closest('.org-view-tree');
+      if (!btn) return;
+      const key = btn.getAttribute('data-group');
+      renderOrgTree(key);
+    });
+
+    if (!groups.length){
+      orgTreeRoot.innerHTML = '<div class="subtle">Nothing to display.</div>';
+    }
+  }
+
+  function buildOrgTreeForRegion(peopleInRegion) {
+    // Create a node for every person in this region
+    const nodes = peopleInRegion.map(p => ({
+      person: p,
+      key: canonicalName(p.FullName || p.Name),
+      managerKey: canonicalName(p.Manager),
+      children: [],
+      depth: 0,
+      x: 0,
+      y: 0,
+      boxWidth: 0,
+      boxHeight: 0,
+    }));
+
+    const byKey = new Map();
+    nodes.forEach(n => {
+      if (n.key) byKey.set(n.key, n);
+    });
+
+    // Link children to managers (within this region only)
+    nodes.forEach(node => {
+      const mgr = node.managerKey && byKey.get(node.managerKey);
+      if (mgr && mgr !== node) {
+        mgr.children.push(node);
+      }
+    });
+
+    // Roots: people whose manager is not in this region (or blank/self)
+    const roots = nodes.filter(node => {
+      const mgr = node.managerKey && byKey.get(node.managerKey);
+      return !mgr || mgr === node;
+    });
+
+    // Assign depth via BFS from all roots
+    const queue = [];
+    const visited = new Set();
+
+    roots.forEach(root => {
+      root.depth = 0;
+      queue.push(root);
+      visited.add(root);
+    });
+
+    while (queue.length) {
+      const current = queue.shift();
+      current.children.forEach(child => {
+        if (!visited.has(child)) {
+          child.depth = current.depth + 1;
+          visited.add(child);
+          queue.push(child);
+        }
+      });
+    }
+
+    // Any unvisited nodes (broken manager chain) become additional roots at depth 0
+    nodes.forEach(node => {
+      if (!visited.has(node)) {
+        node.depth = 0;
+        roots.push(node);
+      }
+    });
+
+    return { nodes, roots };
+  }
+
+  function layoutOrgTree(nodes) {
+    // Group nodes by depth
+    const levels = new Map();
+    let maxDepth = 0;
+
+    nodes.forEach(node => {
+      const d = node.depth || 0;
+      if (!levels.has(d)) levels.set(d, []);
+      levels.get(d).push(node);
+      if (d > maxDepth) maxDepth = d;
+    });
+
+    // Order peers within a level by grade then name
+    levels.forEach(levelNodes => {
+      levelNodes.sort((a, b) => {
+        const ga = gradeIndex(a.person.Grade);
+        const gb = gradeIndex(b.person.Grade);
+        if (ga !== gb) return ga - gb;
+        return (a.person.FullName || a.person.Name || '')
+          .localeCompare(b.person.FullName || b.person.Name || '');
+      });
+    });
+
+    const slideWidth = 10;      // inches
+    const leftMargin = 0.5;
+    const rightMargin = 0.5;
+    const availableWidth = slideWidth - leftMargin - rightMargin;
+
+    const defaultBoxWidth = 2.5;
+    const boxHeight = 0.6;
+    const topMargin = 1.2;
+    const levelGap = 1.3;
+
+    for (let depth = 0; depth <= maxDepth; depth++) {
+      const levelNodes = levels.get(depth) || [];
+      if (!levelNodes.length) continue;
+
+      const count = levelNodes.length;
+      const step = availableWidth / count;
+
+      // Ensure boxes fit inside the step (no overlap)
+      const boxWidth = Math.min(defaultBoxWidth, step - 0.15);
+
+      levelNodes.forEach((node, index) => {
+        const xStart = leftMargin + step * index;
+        node.boxWidth = boxWidth;
+        node.boxHeight = boxHeight;
+        node.x = xStart + (step - boxWidth) / 2;
+        node.y = topMargin + depth * levelGap;
+      });
+    }
+  }
+
+  function exportOrganigramToPpt() {
+    const allPeople = state.people || [];
+    if (!allPeople.length){
+      alert('Please load a CSV/XLSX first.');
+      return;
+    }
+    if (orgGroupBy.value !== 'region'){
+      alert('Please group by Region before exporting to PowerPoint.');
+      return;
+    }
+
+    const pptx = new PptxGenJS();
+    const groups = new Map();
+    allPeople.forEach(p => {
+      const region = p.Region || 'Unknown region';
+      if (!groups.has(region)) groups.set(region, []);
+      groups.get(region).push(p);
+    });
+
+    groups.forEach((peopleInRegion, regionLabel) => {
+      const slide = pptx.addSlide();
+      slide.addText(`${regionLabel} – Line Management Organigram`, {
+        x: 0.5, y: 0.3, w: 9, h: 0.5,
+        fontSize: 20, bold: true
+      });
+
+      const { nodes } = buildOrgTreeForRegion(peopleInRegion);
+      layoutOrgTree(nodes);
+
+      nodes.forEach(node => {
+        const p = node.person;
+        const textLines = [];
+
+        textLines.push(p.FullName || p.Name || '');
+        if (p.Grade) textLines.push(p.Grade);
+        const details = [p.Discipline, p.Office].filter(Boolean).join(' • ');
+        if (details) textLines.push(details);
+
+        const cap = Number(p.Capacity || 0);
+        const used = Number(p.currentReports || 0);
+        const status = p.capStatus || (cap ? (used < cap ? 'Under' : (used === cap ? 'At' : 'Over')) : '');
+        if (cap) textLines.push(`${status} ${used}/${cap}`);
+
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: node.x,
+          y: node.y,
+          w: node.boxWidth,
+          h: node.boxHeight,
+          fill: { color: '1f2230' },
+          line: { color: 'ffffff', width: 0.5 },
+          rectRadius: 6
+        });
+
+        slide.addText(textLines.join('\n'), {
+          x: node.x,
+          y: node.y,
+          w: node.boxWidth,
+          h: node.boxHeight,
+          fontSize: 11,
+          align: 'center',
+          valign: 'middle'
+        });
+      });
+
+      const byKey = new Map();
+      nodes.forEach(n => {
+        const key = canonicalName(n.person.Name || n.person.FullName);
+        if (key) byKey.set(key, n);
+      });
+
+      nodes.forEach(node => {
+        const mgrKey = canonicalName(node.person.Manager);
+        const parent = mgrKey && byKey.get(mgrKey);
+        if (!parent || parent === node) return;
+
+        const parentCenterX = parent.x + parent.boxWidth / 2;
+        const parentBottomY = parent.y + parent.boxHeight;
+        const childTopY = node.y;
+
+        const lineHeight = childTopY - parentBottomY;
+        if (lineHeight > 0) {
+          slide.addShape('line', {
+            x: parentCenterX,
+            y: parentBottomY,
+            w: 0,
+            h: lineHeight,
+            line: { width: 0.75, color: '808080' }
+          });
+        }
+      });
+
+      console.log('Region PPT tree', regionLabel, 'nodes:', nodes.length, 'expected:', peopleInRegion.length);
+    });
+
+    pptx.writeFile({ fileName: 'LineManagementOrganigram.pptx' });
+  }
+
+  orgBuildBtn.addEventListener('click', renderOrganigram);
+  exportPptBtn.addEventListener('click', exportOrganigramToPpt);
+
+  // --- Tabs --------------------------------------------------------------
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b===btn));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id === 'tab-'+tab));
+    });
+  });
+
+  // --- Export / Clear / Load buttons -------------------------------------
+  const fileInput = document.getElementById('fileInput');
+  document.getElementById('btnLoad').addEventListener('click', ()=> fileInput.click());
+  document.getElementById('btnClear').addEventListener('click', ()=>{
+    state.rawObjects = [];
+    state.people = [];
+    state.orgTreesByGroup = {};
+    fileInput.value = '';
+    peopleSearch.value = '';
+    renderAll();
+  });
+  fileInput.addEventListener('change', e=>{
+    const file = e.target.files && e.target.files[0];
+    if (file) handleFile(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('btnExport').addEventListener('click', ()=>{
+    const people = state.people || [];
+    if (!people.length){
+      alert('No data to export.');
+      return;
+    }
+    const rows = [
+      ['Surname','First Forename','Grade','Grade Level','Discipline','Office','Region','Area','Manager','Is Manager','Capacity','Current reports']
+    ];
+    people.forEach(p=>{
+      rows.push([
+        p.Surname || '',
+        p.FirstForename || '',
+        p.Grade || '',
+        p.GradeLevel || '',
+        p.Discipline || '',
+        p.Office || '',
+        p.Region || '',
+        p.Area || '',
+        p.Manager || '',
+        (p.IsManager || p.currentReports>0) ? 'Y' : '',
+        p.Capacity || 0,
+        p.currentReports || 0
+      ]);
+    });
+    const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+    const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'gleeds-line-management-export.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // --- Global render -----------------------------------------------------
+  function renderAll(){
+    renderSummary();
+    renderPeopleTable();
+    fillFilterOptions();
+    populateCapacityRegions();
+    populateOfficeSelect(filterOfficeSelect, (fmRegion && fmRegion.value) || 'Any');
+    populateOfficeSelect(capacityOfficeSelect, (capacityRegionSelect && capacityRegionSelect.value) || 'Any');
+    updateCapacityResults();
+    const hasData = (state.people || []).length>0;
+    orgBuildBtn.disabled = !hasData;
+    exportPptBtn.disabled = !hasData;
+    if (!hasData){
+      fmResults.innerHTML = '<div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>';
+      orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>';
+    }
+  }
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
