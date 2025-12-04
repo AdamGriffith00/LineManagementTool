@@ -1385,6 +1385,20 @@
     return 99;
   }
 
+  function getPersonNameKey(person) {
+    if (!person) return '';
+
+    const raw =
+      person.Name ||
+      person['Full name'] ||
+      person['Full Name'] ||
+      person['Employee'] ||
+      person['Employee name'] ||
+      '';
+
+    return String(raw).trim().toLowerCase();
+  }
+
   function clearOrgHighlightsInGroup(groupRoot) {
     if (!groupRoot) return;
     const cards = groupRoot.querySelectorAll('.org-person-card');
@@ -1425,7 +1439,7 @@
 
     const reports = node.children || [];
     reports.forEach(child => {
-      const childKey = (child.person.Name || '').toLowerCase();
+      const childKey = getPersonNameKey(child.person);
       if (!childKey) return;
       const childCard = root.querySelector(
         `.org-person-card[data-person-name="${childKey}"]`
@@ -1441,7 +1455,7 @@
     card.className = 'org-card org-person-card';
     card.style.cursor = 'pointer';
 
-    const personName = (person.Name || '').toLowerCase();
+    const personName = getPersonNameKey(person);
     if (personName) {
       card.dataset.personName = personName;
     }
@@ -1556,7 +1570,7 @@
 
     const nodeByName = new Map();
     nodes.forEach(node => {
-      const key = (node.person.Name || '').toLowerCase();
+      const key = getPersonNameKey(node.person);
       if (key) nodeByName.set(key, node);
     });
 
