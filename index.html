@@ -1392,6 +1392,18 @@
     return 99;
   }
 
+  function getOrgTreeRootFromCard(card) {
+    if (card && typeof card.closest === 'function') {
+      const closestTree = card.closest('.org-tree');
+      if (closestTree) return closestTree;
+    }
+
+    const byId = document.getElementById('orgTreeRoot');
+    if (byId) return byId;
+
+    return null;
+  }
+
   function clearOrgHighlights(treeRoot) {
     if (!treeRoot) return;
     treeRoot.querySelectorAll('.org-person-card').forEach(el => {
@@ -1402,15 +1414,20 @@
 
   function renderOrgReportsSummary(managerCard, reports, reportNames) {
     if (!managerCard || !managerCard.parentElement) return;
-    managerCard.parentElement.querySelectorAll('.org-reports-summary').forEach(el => el.remove());
+
+    managerCard.parentElement
+      .querySelectorAll('.org-reports-summary')
+      .forEach(el => el.remove());
 
     const container = document.createElement('div');
     container.className = 'org-reports-summary';
 
-    if (!reports || !reports.length) {
+    if (!reports || reports.length === 0) {
       container.textContent = 'Direct reports: none';
     } else {
-      container.textContent = `Direct reports (${reports.length}): ${reportNames.join(', ')}`;
+      const count = reports.length;
+      const list = reportNames.join(', ');
+      container.textContent = `Direct reports (${count}): ${list}`;
     }
 
     managerCard.parentElement.appendChild(container);
@@ -1420,35 +1437,44 @@
     const card = evt.currentTarget;
     const personKey = card.dataset.personKey;
     const groupKey = card.dataset.groupKey;
-    if (!personKey || !groupKey || !state.orgTrees || !state.orgTrees[groupKey]) return;
 
-    const { nodeByKey } = state.orgTrees[groupKey];
-    const node = nodeByKey.get(personKey);
+    if (!personKey || !groupKey || !state.orgTrees || !state.orgTrees[groupKey]) {
+      return;
+    }
+
+    const treeInfo = state.orgTrees[groupKey];
+    const node = treeInfo.nodeByKey.get(personKey);
     if (!node) return;
 
-    const treeRoot = card.closest('.org-tree');
+    const treeRoot = getOrgTreeRootFromCard(card);
+    if (!treeRoot) return;
+
     clearOrgHighlights(treeRoot);
 
     card.classList.add('org-highlight-manager');
 
     const reports = node.children || [];
     const reportNames = [];
+
     reports.forEach(child => {
       const key = (child.person.Name || '').toLowerCase();
       if (!key) return;
       reportNames.push(child.person.Name);
-      const selector = `.org-person-card[data-group-key="${groupKey}"][data-person-key="${key}"]`;
-      const childCard = treeRoot ? treeRoot.querySelector(selector) : null;
-      if (childCard) childCard.classList.add('org-highlight-report');
+
+      const selector =
+        `.org-person-card[data-group-key="${groupKey}"][data-person-key="${key}"]`;
+      const childCard = treeRoot.querySelector(selector);
+      if (childCard) {
+        childCard.classList.add('org-highlight-report');
+      }
     });
 
-    if (treeRoot) {
-      treeRoot.querySelectorAll('.org-person-card').forEach(el => {
-        if (!el.classList.contains('org-highlight-manager') && !el.classList.contains('org-highlight-report')) {
-          el.classList.add('org-dimmed');
-        }
-      });
-    }
+    treeRoot.querySelectorAll('.org-person-card').forEach(el => {
+      if (!el.classList.contains('org-highlight-manager') &&
+          !el.classList.contains('org-highlight-report')) {
+        el.classList.add('org-dimmed');
+      }
+    });
 
     renderOrgReportsSummary(card, reports, reportNames);
   }
@@ -1456,6 +1482,7 @@
   function createOrgTreeCard(person, groupKey) {
     const card = document.createElement('div');
     card.className = 'org-card org-person-card';
+    card.style.cursor = 'pointer';
 
     const key = (person.Name || '').toLowerCase();
     if (key) card.dataset.personKey = key;
