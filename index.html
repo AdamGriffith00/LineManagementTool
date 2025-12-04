@@ -1394,9 +1394,10 @@
       person['Full Name'] ||
       person['Employee'] ||
       person['Employee name'] ||
+      person.name ||
       '';
 
-    return String(raw).trim().toLowerCase();
+    return canonicalName(raw);
   }
 
   function clearOrgHighlightsInGroup(groupRoot) {
@@ -1410,39 +1411,44 @@
   function onOrgPersonCardClick(evt) {
     const card = evt.currentTarget;
     const groupKey = card.dataset.groupKey;
-    const personKey = (card.dataset.personName || '').toLowerCase();
+    const personKey = (card.dataset.personKey || '').toLowerCase();
 
     console.log('Org card clicked:', { groupKey, personKey });
 
     if (!groupKey || !personKey) return;
-    if (!window.state || !state.orgTreesByGroup || !state.orgTreesByGroup[groupKey]) {
+    const treeInfo = state.orgTreesByGroup && state.orgTreesByGroup[groupKey];
+    if (!treeInfo) {
       console.warn('No tree info for groupKey', groupKey);
       return;
     }
 
-    const tree = state.orgTreesByGroup[groupKey];
-    const node = tree.nodeByName.get(personKey);
+    const node = treeInfo.nodeByName.get(personKey);
     if (!node) {
       console.warn('No node found for personKey', personKey);
       return;
     }
 
-    const root = document.querySelector(`.org-group[data-group-key="${groupKey}"]`);
-    if (!root) {
-      console.warn('No org-group container for groupKey', groupKey);
-      return;
-    }
+    const groupRoot = document.querySelector(
+      `.org-group[data-group-key="${groupKey}"]`
+    );
+    if (!groupRoot) return;
 
-    clearOrgHighlightsInGroup(root);
+    groupRoot
+      .querySelectorAll(
+        '.org-person-card.org-highlight-manager, .org-person-card.org-highlight-report'
+      )
+      .forEach(el => el.classList.remove('org-highlight-manager', 'org-highlight-report'));
 
     card.classList.add('org-highlight-manager');
 
-    const reports = node.children || [];
-    reports.forEach(child => {
-      const childKey = getPersonNameKey(child.person);
+    (node.children || []).forEach(child => {
+      const childKey = canonicalName(
+        (child.person && (child.person.Name || child.person.name || child.person['Full name'])) || ''
+      );
       if (!childKey) return;
-      const childCard = root.querySelector(
-        `.org-person-card[data-person-name="${childKey}"]`
+
+      const childCard = groupRoot.querySelector(
+        `.org-person-card[data-person-key="${childKey}"]`
       );
       if (childCard) {
         childCard.classList.add('org-highlight-report');
@@ -1450,14 +1456,15 @@
     });
   }
 
-  function createOrgTreeCard(person, groupKey) {
+  function createOrgTreeCard(node, groupKey) {
+    const person = node.person;
     const card = document.createElement('div');
     card.className = 'org-card org-person-card';
     card.style.cursor = 'pointer';
 
-    const personName = getPersonNameKey(person);
-    if (personName) {
-      card.dataset.personName = personName;
+    const personKey = node.personKey || getPersonNameKey(person);
+    if (personKey) {
+      card.dataset.personKey = personKey;
     }
     if (groupKey) {
       card.dataset.groupKey = groupKey;
@@ -1570,8 +1577,21 @@
 
     const nodeByName = new Map();
     nodes.forEach(node => {
-      const key = getPersonNameKey(node.person);
-      if (key) nodeByName.set(key, node);
+      const person = node.person || node.raw || {};
+      const rawName =
+        person.Name ||
+        person['Full name'] ||
+        person['Full Name'] ||
+        person['Employee'] ||
+        person['Employee name'] ||
+        person.name ||
+        '';
+
+      const key = canonicalName(rawName);
+      if (key) {
+        nodeByName.set(key, node);
+        node.personKey = key;
+      }
     });
 
     if (!window.state) window.state = {};
@@ -1616,7 +1636,7 @@
       const row = document.createElement('div');
       row.className = 'org-level-row';
       levelNodes.forEach(node => {
-        row.appendChild(createOrgTreeCard(node.person, groupKey));
+        row.appendChild(createOrgTreeCard(node, groupKey));
       });
       groupContainer.appendChild(row);
     }
