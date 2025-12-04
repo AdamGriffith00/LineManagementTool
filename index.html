@@ -495,11 +495,14 @@
     }
 
     .org-person-card.org-highlight-manager {
-      box-shadow: 0 0 0 3px #ffd500;
+      box-shadow: 0 0 0 4px #ffd500;
+      transform: scale(1.03);
+      z-index: 2;
     }
 
     .org-person-card.org-highlight-report {
       box-shadow: 0 0 0 3px #ffd500;
+      z-index: 1;
     }
 
     .org-name { font-weight: 700; font-size: 13px; }
@@ -720,7 +723,7 @@
     rawObjects: [],
     people: [],
     managersByName: new Map(),
-    orgTrees: {},
+    orgTreesByGroup: {},
   };
 
   const GRADE_ORDER = [
@@ -1382,41 +1385,56 @@
     return 99;
   }
 
-  function clearOrgHighlights() {
-    const cards = document.querySelectorAll('.org-person-card');
+  function clearOrgHighlightsInGroup(groupRoot) {
+    if (!groupRoot) return;
+    const cards = groupRoot.querySelectorAll('.org-person-card');
     cards.forEach(card => {
       card.classList.remove('org-highlight-manager', 'org-highlight-report');
     });
   }
 
-  window.highlightOrgReports = function(groupKey, personKey) {
-    if (!window.state || !state.orgTrees || !state.orgTrees[groupKey]) return;
+  function onOrgPersonCardClick(evt) {
+    const card = evt.currentTarget;
+    const groupKey = card.dataset.groupKey;
+    const personKey = (card.dataset.personName || '').toLowerCase();
 
-    const tree = state.orgTrees[groupKey];
-    const node = tree.nodeByName.get(personKey);
-    if (!node) return;
+    console.log('Org card clicked:', { groupKey, personKey });
 
-    clearOrgHighlights();
-
-    const managerCard = document.querySelector(
-      `.org-person-card[data-group-key="${groupKey}"][data-person-name="${personKey}"]`
-    );
-    if (managerCard) {
-      managerCard.classList.add('org-highlight-manager');
+    if (!groupKey || !personKey) return;
+    if (!window.state || !state.orgTreesByGroup || !state.orgTreesByGroup[groupKey]) {
+      console.warn('No tree info for groupKey', groupKey);
+      return;
     }
+
+    const tree = state.orgTreesByGroup[groupKey];
+    const node = tree.nodeByName.get(personKey);
+    if (!node) {
+      console.warn('No node found for personKey', personKey);
+      return;
+    }
+
+    const root = document.querySelector(`.org-group[data-group-key="${groupKey}"]`);
+    if (!root) {
+      console.warn('No org-group container for groupKey', groupKey);
+      return;
+    }
+
+    clearOrgHighlightsInGroup(root);
+
+    card.classList.add('org-highlight-manager');
 
     const reports = node.children || [];
     reports.forEach(child => {
       const childKey = (child.person.Name || '').toLowerCase();
       if (!childKey) return;
-      const childCard = document.querySelector(
-        `.org-person-card[data-group-key="${groupKey}"][data-person-name="${childKey}"]`
+      const childCard = root.querySelector(
+        `.org-person-card[data-person-name="${childKey}"]`
       );
       if (childCard) {
         childCard.classList.add('org-highlight-report');
       }
     });
-  };
+  }
 
   function createOrgTreeCard(person, groupKey) {
     const card = document.createElement('div');
@@ -1425,15 +1443,12 @@
 
     const personName = (person.Name || '').toLowerCase();
     if (personName) {
-      card.setAttribute('data-person-name', personName);
+      card.dataset.personName = personName;
     }
     if (groupKey) {
-      card.setAttribute('data-group-key', groupKey);
+      card.dataset.groupKey = groupKey;
     }
-    card.setAttribute(
-      'onclick',
-      `window.highlightOrgReports('${groupKey ? groupKey.replace(/'/g, "\\'") : ''}', '${personName.replace(/'/g, "\\'")}')`
-    );
+    card.addEventListener('click', onOrgPersonCardClick);
 
     const status = (person.capStatus || '').toLowerCase();
     const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
@@ -1546,8 +1561,8 @@
     });
 
     if (!window.state) window.state = {};
-    if (!state.orgTrees) state.orgTrees = {};
-    state.orgTrees[groupKey] = { nodes, roots, nodeByName };
+    if (!state.orgTreesByGroup) state.orgTreesByGroup = {};
+    state.orgTreesByGroup[groupKey] = { nodes, roots, nodeByName };
 
     const levels = new Map();
     let maxDepth = 0;
@@ -1577,6 +1592,10 @@
       return;
     }
 
+    const groupContainer = document.createElement('div');
+    groupContainer.className = 'org-group org-tree';
+    groupContainer.setAttribute('data-group-key', groupKey);
+
     for (let depth = 0; depth <= maxDepth; depth++){
       const levelNodes = levels.get(depth) || [];
       if (!levelNodes.length) continue;
@@ -1585,9 +1604,10 @@
       levelNodes.forEach(node => {
         row.appendChild(createOrgTreeCard(node.person, groupKey));
       });
-      detail.appendChild(row);
+      groupContainer.appendChild(row);
     }
 
+    detail.appendChild(groupContainer);
     console.log('Organigram tree', group.label, 'nodes:', nodes.length, 'expected:', group.people.length);
   }
 
@@ -1598,7 +1618,7 @@
       return;
     }
 
-    state.orgTrees = {};
+    state.orgTreesByGroup = {};
 
     const groups = buildOrganigramGroups();
     orgTreeRoot.innerHTML = '';
@@ -1875,7 +1895,7 @@
   document.getElementById('btnClear').addEventListener('click', ()=>{
     state.rawObjects = [];
     state.people = [];
-    state.orgTrees = {};
+    state.orgTreesByGroup = {};
     fileInput.value = '';
     peopleSearch.value = '';
     renderAll();
