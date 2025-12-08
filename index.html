@@ -1413,7 +1413,7 @@
     const groupKey = card.dataset.groupKey;
     const personKey = (card.dataset.personKey || '').toLowerCase();
 
-    console.log('Org card clicked:', { groupKey, personKey });
+    console.log('Org card clicked:', { groupKey, personKey, dataset: card.dataset });
 
     if (!groupKey || !personKey) return;
     const treeInfo = state.orgTreesByGroup && state.orgTreesByGroup[groupKey];
@@ -1428,9 +1428,9 @@
       return;
     }
 
-    const groupRoot = document.querySelector(
-      `.org-group[data-group-key="${groupKey}"]`
-    );
+    const groupRoot =
+      document.querySelector(`.org-group[data-group-key="${groupKey}"]`) ||
+      document.querySelector('.org-group');
     if (!groupRoot) return;
 
     groupRoot
@@ -1442,9 +1442,17 @@
     card.classList.add('org-highlight-manager');
 
     (node.children || []).forEach(child => {
-      const childKey = canonicalName(
-        (child.person && (child.person.Name || child.person.name || child.person['Full name'])) || ''
-      );
+      const cp = child.person || child.raw || {};
+      const childRaw =
+        cp.FullName ||
+        cp.Name ||
+        cp['Full name'] ||
+        cp['Full Name'] ||
+        cp['Employee name'] ||
+        cp['Employee'] ||
+        cp.name ||
+        '';
+      const childKey = canonicalName(childRaw);
       if (!childKey) return;
 
       const childCard = groupRoot.querySelector(
@@ -1457,18 +1465,24 @@
   }
 
   function createOrgTreeCard(node, groupKey) {
-    const person = node.person;
+    const person = node.person || node.raw || {};
     const card = document.createElement('div');
     card.className = 'org-card org-person-card';
     card.style.cursor = 'pointer';
 
-    const personKey = node.personKey || getPersonNameKey(person);
-    if (personKey) {
-      card.dataset.personKey = personKey;
-    }
-    if (groupKey) {
-      card.dataset.groupKey = groupKey;
-    }
+    const rawName =
+      person.FullName ||
+      person.Name ||
+      person['Full name'] ||
+      person['Full Name'] ||
+      person['Employee name'] ||
+      person['Employee'] ||
+      person.name ||
+      '';
+    const personKey = node.personKey || canonicalName(rawName);
+    console.log('Org card personKey', rawName, '=>', personKey);
+    card.dataset.personKey = personKey || '';
+    card.dataset.groupKey = groupKey || '';
     card.addEventListener('click', onOrgPersonCardClick);
 
     const status = (person.capStatus || '').toLowerCase();
@@ -1579,11 +1593,12 @@
     nodes.forEach(node => {
       const person = node.person || node.raw || {};
       const rawName =
+        person.FullName ||
         person.Name ||
         person['Full name'] ||
         person['Full Name'] ||
-        person['Employee'] ||
         person['Employee name'] ||
+        person['Employee'] ||
         person.name ||
         '';
 
