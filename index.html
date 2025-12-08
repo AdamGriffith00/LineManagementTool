@@ -682,7 +682,6 @@
         </div>
         <div class="org-group-actions">
           <button class="btn" id="orgBuildBtn" disabled>Build organigram</button>
-          <button class="btn" id="exportPptBtn" disabled>Export PPT</button>
         </div>
       </div>
       <div class="org-tree-wrap">
@@ -1328,7 +1327,6 @@
   const orgGroupBy = document.getElementById('orgGroupBy');
   const orgBuildBtn = document.getElementById('orgBuildBtn');
   const orgTreeRoot = document.getElementById('orgTreeRoot');
-  const exportPptBtn = document.getElementById('exportPptBtn');
 
   // --- Helpers for the hierarchy view ---------------------------------------
 
@@ -1829,105 +1827,7 @@
     }
   }
 
-  function exportOrganigramToPpt() {
-    const allPeople = state.people || [];
-    if (!allPeople.length){
-      alert('Please load a CSV/XLSX first.');
-      return;
-    }
-    if (orgGroupBy.value !== 'region'){
-      alert('Please group by Region before exporting to PowerPoint.');
-      return;
-    }
-
-    const pptx = new PptxGenJS();
-    const groups = new Map();
-    allPeople.forEach(p => {
-      const region = p.Region || 'Unknown region';
-      if (!groups.has(region)) groups.set(region, []);
-      groups.get(region).push(p);
-    });
-
-    groups.forEach((peopleInRegion, regionLabel) => {
-      const slide = pptx.addSlide();
-      slide.addText(`${regionLabel} – Line Management Organigram`, {
-        x: 0.5, y: 0.3, w: 9, h: 0.5,
-        fontSize: 20, bold: true
-      });
-
-      const { nodes } = buildOrgTreeForRegion(peopleInRegion);
-      layoutOrgTree(nodes);
-
-      nodes.forEach(node => {
-        const p = node.person;
-        const textLines = [];
-
-        textLines.push(p.FullName || p.Name || '');
-        if (p.Grade) textLines.push(p.Grade);
-        const details = [p.Discipline, p.Office].filter(Boolean).join(' • ');
-        if (details) textLines.push(details);
-
-        const cap = Number(p.Capacity || 0);
-        const used = Number(p.currentReports || 0);
-        const status = p.capStatus || (cap ? (used < cap ? 'Under' : (used === cap ? 'At' : 'Over')) : '');
-        if (cap) textLines.push(`${status} ${used}/${cap}`);
-
-        slide.addShape(pptx.ShapeType.roundRect, {
-          x: node.x,
-          y: node.y,
-          w: node.boxWidth,
-          h: node.boxHeight,
-          fill: { color: '1f2230' },
-          line: { color: 'ffffff', width: 0.5 },
-          rectRadius: 6
-        });
-
-        slide.addText(textLines.join('\n'), {
-          x: node.x,
-          y: node.y,
-          w: node.boxWidth,
-          h: node.boxHeight,
-          fontSize: 11,
-          align: 'center',
-          valign: 'middle'
-        });
-      });
-
-      const byKey = new Map();
-      nodes.forEach(n => {
-        const key = canonicalName(n.person.Name || n.person.FullName);
-        if (key) byKey.set(key, n);
-      });
-
-      nodes.forEach(node => {
-        const mgrKey = canonicalName(node.person.Manager);
-        const parent = mgrKey && byKey.get(mgrKey);
-        if (!parent || parent === node) return;
-
-        const parentCenterX = parent.x + parent.boxWidth / 2;
-        const parentBottomY = parent.y + parent.boxHeight;
-        const childTopY = node.y;
-
-        const lineHeight = childTopY - parentBottomY;
-        if (lineHeight > 0) {
-          slide.addShape('line', {
-            x: parentCenterX,
-            y: parentBottomY,
-            w: 0,
-            h: lineHeight,
-            line: { width: 0.75, color: '808080' }
-          });
-        }
-      });
-
-      console.log('Region PPT tree', regionLabel, 'nodes:', nodes.length, 'expected:', peopleInRegion.length);
-    });
-
-    pptx.writeFile({ fileName: 'LineManagementOrganigram.pptx' });
-  }
-
   orgBuildBtn.addEventListener('click', renderOrganigram);
-  exportPptBtn.addEventListener('click', exportOrganigramToPpt);
 
   // --- Tabs --------------------------------------------------------------
   document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -2003,7 +1903,6 @@
     updateCapacityResults();
     const hasData = (state.people || []).length>0;
     orgBuildBtn.disabled = !hasData;
-    exportPptBtn.disabled = !hasData;
     if (!hasData){
       fmResults.innerHTML = '<div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>';
       orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>';
