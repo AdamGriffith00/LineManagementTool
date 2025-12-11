@@ -575,8 +575,6 @@
             <span class="label">People:</span> <span class="value">0</span>
             <span class="dot">•</span>
             <span class="label">Managers:</span> <span class="value">0</span>
-            <span class="dot">•</span>
-            <span class="label">Top-level:</span> <span class="value">0</span>
           </div>
           <div class="summary-badges" id="summaryBadges">
             <div class="summary-badge"><span>Under capacity</span> <strong>0</strong></div>
@@ -1050,7 +1048,6 @@
     const total = people.length;
     const managerList = people.filter(p=>p.IsManager || p.currentReports>0);
     const managers = managerList.length;
-    const top = people.filter(p=>!p.Manager || !p.Manager.toString().trim()).length;
     const under = managerList.filter(p=>p.capStatus==='under').length;
     const full = managerList.filter(p=>p.capStatus==='full').length;
     const over = managerList.filter(p=>p.capStatus==='over').length;
@@ -1059,8 +1056,6 @@
       <span class="label">People:</span> <span class="value">${total}</span>
       <span class="dot">•</span>
       <span class="label">Managers:</span> <span class="value">${managers}</span>
-      <span class="dot">•</span>
-      <span class="label">Top-level:</span> <span class="value">${top}</span>
     `;
     badges.innerHTML = `
       <div class="summary-badge"><span>Under capacity</span> <strong>${under}</strong></div>
