@@ -606,17 +606,17 @@
           <div class="filters-row">
             <div class="field">
               <div class="field-label">Region</div>
-              <select id="fmRegion"></select>
+              <select id="fmRegion" multiple size="4"></select>
             </div>
             <div class="field">
               <div class="field-label">Office</div>
-              <select id="filter-office">
+              <select id="filter-office" multiple size="4">
                 <option value="Any">Any office</option>
               </select>
             </div>
             <div class="field">
               <div class="field-label">Grade (manager)</div>
-              <select id="fmGrade"></select>
+              <select id="fmGrade" multiple size="4"></select>
             </div>
             <div class="field">
               <div class="field-label">Minimum free capacity</div>
@@ -811,20 +811,23 @@
     return cap - used; // > 0 free, < 0 over, 0 at
   }
 
-  function getOfficesForRegion(region) {
+  function getOfficesForRegion(regionOrRegions) {
+    const regions = Array.isArray(regionOrRegions) ? regionOrRegions : [regionOrRegions];
+    const regionSet = new Set(regions.filter(Boolean));
+    const includeAll = regionSet.size === 0 || regionSet.has('Any');
     const offices = new Set();
     (state.people || []).forEach(p => {
       if (!p.Office) return;
-      if (region === 'Any' || (p.Region || '') === region) {
+      if (includeAll || regionSet.has(p.Region || '')) {
         offices.add(p.Office);
       }
     });
     return Array.from(offices).sort();
   }
 
-  function populateOfficeSelect(selectEl, region) {
+  function populateOfficeSelect(selectEl, regionOrRegions) {
     if (!selectEl) return;
-    const offices = getOfficesForRegion(region);
+    const offices = getOfficesForRegion(regionOrRegions);
     let html = '<option value="Any">Any office</option>';
     offices.forEach(office => {
       html += `<option value="${office}">${office}</option>`;
@@ -1137,14 +1140,26 @@
 
   function uniq(arr){ return Array.from(new Set(arr.filter(Boolean))).sort((a,b)=>a.localeCompare(b)); }
   function fillSelect(sel, items){
-    sel.innerHTML = '<option value="">Any</option>' + items.map(v=>`<option>${v}</option>`).join('');
+    sel.innerHTML = '<option value="Any">Any</option>' + items.map(v=>`<option>${v}</option>`).join('');
+  }
+  function getSelectedValues(selectEl){
+    if (!selectEl) return [];
+    return Array.from(selectEl.selectedOptions || []).map(opt => opt.value).filter(Boolean);
+  }
+  function selectAnyOption(selectEl){
+    if (!selectEl) return;
+    Array.from(selectEl.options).forEach(opt => {
+      opt.selected = opt.value === 'Any';
+    });
   }
 
   function fillFilterOptions(){
     const people = state.people || [];
     fillSelect(fmRegion, uniq(people.map(p=>p.Region)));
-    populateOfficeSelect(filterOfficeSelect, (fmRegion && fmRegion.value) || 'Any');
+    selectAnyOption(fmRegion);
+    populateOfficeSelect(filterOfficeSelect, 'Any');
     fillSelect(fmGrade, uniq(people.map(p=>p.Grade)));
+    selectAnyOption(fmGrade);
     const hasData = people.length>0;
     fmSearchBtn.disabled = !hasData;
     fmClearBtn.disabled = !hasData;
@@ -1175,24 +1190,25 @@
 
   if (fmRegion){
     fmRegion.addEventListener('change', ()=>{
-      const region = fmRegion.value || 'Any';
-      populateOfficeSelect(filterOfficeSelect, region);
-      if (filterOfficeSelect) filterOfficeSelect.value = 'Any';
+      const selectedRegions = getSelectedValues(fmRegion);
+      const regionFilters = selectedRegions.length ? selectedRegions : ['Any'];
+      populateOfficeSelect(filterOfficeSelect, regionFilters);
+      selectAnyOption(filterOfficeSelect);
     });
   }
 
   fmSearchBtn.addEventListener('click', ()=>{
     const people = state.people || [];
-    const reg = fmRegion.value;
-    const office = filterOfficeSelect ? filterOfficeSelect.value : 'Any';
-    const grade = fmGrade.value;
+    const regions = getSelectedValues(fmRegion);
+    const offices = getSelectedValues(filterOfficeSelect);
+    const grades = getSelectedValues(fmGrade);
     const minFree = parseInt(fmFreeCap.value || '0', 10);
     const candidates = people.filter(p=>{
       const isManager = p.IsManager || p.currentReports>0;
       if (!isManager) return false;
-      if (reg && p.Region !== reg) return false;
-      if (office && office !== 'Any' && (p.Office || '') !== office) return false;
-      if (grade && p.Grade !== grade) return false;
+      if (regions.length && !regions.includes('Any') && !regions.includes(p.Region || '')) return false;
+      if (offices.length && !offices.includes('Any') && !offices.includes(p.Office || '')) return false;
+      if (grades.length && !grades.includes('Any') && !grades.includes(p.Grade || '')) return false;
       if ((p.freeSlots || 0) < minFree) return false;
       return true;
     }).sort((a,b)=>{
@@ -1204,10 +1220,10 @@
   });
 
   fmClearBtn.addEventListener('click', ()=>{
-    fmRegion.value = '';
+    selectAnyOption(fmRegion);
     populateOfficeSelect(filterOfficeSelect, 'Any');
-    if (filterOfficeSelect) filterOfficeSelect.value = 'Any';
-    fmGrade.value = '';
+    selectAnyOption(filterOfficeSelect);
+    selectAnyOption(fmGrade);
     fmFreeCap.value = 1;
     fmResults.innerHTML = '<div class="subtle">Cleared. Set filters and click <strong>Suggest</strong>.</div>';
   });
