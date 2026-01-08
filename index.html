@@ -233,6 +233,61 @@
       font-size: 13px;
     }
 
+    .multi-select { position: relative; }
+    .multi-select-toggle {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border-soft);
+      background: #151823;
+      color: var(--text-main);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .multi-select-toggle:focus {
+      outline: 2px solid rgba(255, 212, 0, 0.4);
+      outline-offset: 2px;
+    }
+    .multi-select-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+    }
+    .multi-select-summary { font-size: 12px; }
+    .multi-select-arrow { font-size: 10px; color: var(--text-soft); }
+    .multi-select-menu {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      background: #151823;
+      border: 1px solid var(--border-soft);
+      border-radius: 12px;
+      padding: 8px;
+      display: none;
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 20;
+    }
+    .multi-select.open .multi-select-menu { display: block; }
+    .multi-select-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-main);
+    }
+    .multi-select-option:hover { background: #1c2030; }
+    .multi-select-option input { accent-color: var(--accent-yellow); }
+
     input[type="file"] {
       font-size: 12px;
       color: var(--text-soft);
@@ -605,18 +660,34 @@
           <div class="pill-label">Find a line manager</div>
           <div class="filters-row">
             <div class="field">
-              <div class="field-label">Region</div>
-              <select id="fmRegion" multiple size="4"></select>
+              <div class="multi-select" data-filter="region">
+                <button type="button" class="multi-select-toggle">
+                  <span class="multi-select-label">Region</span>
+                  <span class="multi-select-summary">Any</span>
+                  <span class="multi-select-arrow">▼</span>
+                </button>
+                <div class="multi-select-menu"></div>
+              </div>
             </div>
             <div class="field">
-              <div class="field-label">Office</div>
-              <select id="filter-office" multiple size="4">
-                <option value="Any">Any office</option>
-              </select>
+              <div class="multi-select" data-filter="office">
+                <button type="button" class="multi-select-toggle">
+                  <span class="multi-select-label">Office</span>
+                  <span class="multi-select-summary">Any</span>
+                  <span class="multi-select-arrow">▼</span>
+                </button>
+                <div class="multi-select-menu"></div>
+              </div>
             </div>
             <div class="field">
-              <div class="field-label">Grade (manager)</div>
-              <select id="fmGrade" multiple size="4"></select>
+              <div class="multi-select" data-filter="grade">
+                <button type="button" class="multi-select-toggle">
+                  <span class="multi-select-label">Grade (manager)</span>
+                  <span class="multi-select-summary">Any</span>
+                  <span class="multi-select-arrow">▼</span>
+                </button>
+                <div class="multi-select-menu"></div>
+              </div>
             </div>
             <div class="field">
               <div class="field-label">Minimum free capacity</div>
@@ -1130,36 +1201,150 @@
   peopleSearch.addEventListener('input', renderPeopleTable);
 
   // --- Find a manager ----------------------------------------------------
-  const fmRegion = document.getElementById('fmRegion');
-  const filterOfficeSelect = document.getElementById('filter-office');
-  const fmGrade = document.getElementById('fmGrade');
   const fmFreeCap = document.getElementById('fmFreeCap');
   const fmSearchBtn = document.getElementById('fmSearchBtn');
   const fmClearBtn = document.getElementById('fmClearBtn');
   const fmResults = document.getElementById('fmResults');
 
+  let selectedRegions = [];
+  let selectedOffices = [];
+  let selectedGrades = [];
+  const multiSelectOptions = { region: [], office: [], grade: [] };
+
   function uniq(arr){ return Array.from(new Set(arr.filter(Boolean))).sort((a,b)=>a.localeCompare(b)); }
-  function fillSelect(sel, items){
-    sel.innerHTML = '<option value="Any">Any</option>' + items.map(v=>`<option>${v}</option>`).join('');
+  function getMultiSelect(filterKey){
+    return document.querySelector(`.multi-select[data-filter="${filterKey}"]`);
   }
-  function getSelectedValues(selectEl){
-    if (!selectEl) return [];
-    return Array.from(selectEl.selectedOptions || []).map(opt => opt.value).filter(Boolean);
+  function updateMultiSelectSummary(filterKey, selectedValues){
+    const ms = getMultiSelect(filterKey);
+    if (!ms) return;
+    const summaryEl = ms.querySelector('.multi-select-summary');
+    if (!summaryEl) return;
+    if (!selectedValues || selectedValues.length === 0) {
+      summaryEl.textContent = 'Any';
+    } else if (selectedValues.length === 1) {
+      summaryEl.textContent = selectedValues[0];
+    } else {
+      summaryEl.textContent = `${selectedValues[0]} +${selectedValues.length - 1}`;
+    }
   }
-  function selectAnyOption(selectEl){
-    if (!selectEl) return;
-    Array.from(selectEl.options).forEach(opt => {
-      opt.selected = opt.value === 'Any';
+  function resetMultiSelectSummary(filterKey){
+    updateMultiSelectSummary(filterKey, []);
+  }
+  function getSelectedArray(filterKey){
+    if (filterKey === 'region') return selectedRegions;
+    if (filterKey === 'office') return selectedOffices;
+    return selectedGrades;
+  }
+  function setSelectedArray(filterKey, values){
+    if (filterKey === 'region') selectedRegions = values;
+    else if (filterKey === 'office') selectedOffices = values;
+    else selectedGrades = values;
+  }
+  function handleMultiSelectChange(filterKey, value, checked){
+    const current = getSelectedArray(filterKey).slice();
+    if (value === 'Any') {
+      if (checked) current.length = 0;
+    } else {
+      if (checked) {
+        if (!current.includes(value)) current.push(value);
+      } else {
+        const idx = current.indexOf(value);
+        if (idx >= 0) current.splice(idx, 1);
+      }
+    }
+    setSelectedArray(filterKey, current);
+    updateMultiSelectSummary(filterKey, current);
+    renderMultiSelectOptions(filterKey, multiSelectOptions[filterKey] || []);
+    if (filterKey === 'region') {
+      updateOfficeOptions();
+    }
+  }
+  function renderMultiSelectOptions(filterKey, options){
+    const ms = getMultiSelect(filterKey);
+    if (!ms) return;
+    const menu = ms.querySelector('.multi-select-menu');
+    if (!menu) return;
+    const selectedValues = getSelectedArray(filterKey);
+    menu.innerHTML = '';
+
+    const anyChecked = selectedValues.length === 0;
+    const anyLabel = document.createElement('label');
+    anyLabel.className = 'multi-select-option';
+    const anyInput = document.createElement('input');
+    anyInput.type = 'checkbox';
+    anyInput.value = 'Any';
+    anyInput.checked = anyChecked;
+    anyInput.addEventListener('change', () => {
+      handleMultiSelectChange(filterKey, anyInput.value, anyInput.checked);
     });
+    const anyText = document.createElement('span');
+    anyText.className = 'multi-select-option-label';
+    anyText.textContent = 'Any';
+    anyLabel.appendChild(anyInput);
+    anyLabel.appendChild(anyText);
+    menu.appendChild(anyLabel);
+
+    options.forEach(optionValue => {
+      const label = document.createElement('label');
+      label.className = 'multi-select-option';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = optionValue;
+      input.checked = selectedValues.includes(optionValue);
+      input.addEventListener('change', () => {
+        handleMultiSelectChange(filterKey, input.value, input.checked);
+      });
+      const text = document.createElement('span');
+      text.className = 'multi-select-option-label';
+      text.textContent = optionValue;
+      label.appendChild(input);
+      label.appendChild(text);
+      menu.appendChild(label);
+    });
+  }
+  function updateOfficeOptions(){
+    const regionFilters = selectedRegions.length ? selectedRegions : ['Any'];
+    const offices = getOfficesForRegion(regionFilters);
+    multiSelectOptions.office = offices;
+    selectedOffices = selectedOffices.filter(office => offices.includes(office));
+    renderMultiSelectOptions('office', offices);
+    updateMultiSelectSummary('office', selectedOffices);
+  }
+  function closeAllMultiSelects(){
+    document.querySelectorAll('.multi-select.open').forEach(ms => ms.classList.remove('open'));
+  }
+  function setupMultiSelects(){
+    document.querySelectorAll('.multi-select').forEach(ms => {
+      const toggle = ms.querySelector('.multi-select-toggle');
+      const menu = ms.querySelector('.multi-select-menu');
+      if (toggle) {
+        toggle.addEventListener('click', event => {
+          event.stopPropagation();
+          const isOpen = ms.classList.contains('open');
+          closeAllMultiSelects();
+          if (!isOpen) ms.classList.add('open');
+        });
+      }
+      if (menu) {
+        menu.addEventListener('click', event => event.stopPropagation());
+      }
+    });
+    document.addEventListener('click', closeAllMultiSelects);
   }
 
   function fillFilterOptions(){
     const people = state.people || [];
-    fillSelect(fmRegion, uniq(people.map(p=>p.Region)));
-    selectAnyOption(fmRegion);
-    populateOfficeSelect(filterOfficeSelect, 'Any');
-    fillSelect(fmGrade, uniq(people.map(p=>p.Grade)));
-    selectAnyOption(fmGrade);
+    selectedRegions = [];
+    selectedOffices = [];
+    selectedGrades = [];
+    multiSelectOptions.region = uniq(people.map(p=>p.Region));
+    multiSelectOptions.grade = uniq(people.map(p=>p.Grade));
+    renderMultiSelectOptions('region', multiSelectOptions.region);
+    updateMultiSelectSummary('region', selectedRegions);
+    renderMultiSelectOptions('grade', multiSelectOptions.grade);
+    updateMultiSelectSummary('grade', selectedGrades);
+    updateOfficeOptions();
     const hasData = people.length>0;
     fmSearchBtn.disabled = !hasData;
     fmClearBtn.disabled = !hasData;
@@ -1188,27 +1373,17 @@
     }).join('');
   }
 
-  if (fmRegion){
-    fmRegion.addEventListener('change', ()=>{
-      const selectedRegions = getSelectedValues(fmRegion);
-      const regionFilters = selectedRegions.length ? selectedRegions : ['Any'];
-      populateOfficeSelect(filterOfficeSelect, regionFilters);
-      selectAnyOption(filterOfficeSelect);
-    });
-  }
+  setupMultiSelects();
 
   fmSearchBtn.addEventListener('click', ()=>{
     const people = state.people || [];
-    const regions = getSelectedValues(fmRegion);
-    const offices = getSelectedValues(filterOfficeSelect);
-    const grades = getSelectedValues(fmGrade);
     const minFree = parseInt(fmFreeCap.value || '0', 10);
     const candidates = people.filter(p=>{
       const isManager = p.IsManager || p.currentReports>0;
       if (!isManager) return false;
-      if (regions.length && !regions.includes('Any') && !regions.includes(p.Region || '')) return false;
-      if (offices.length && !offices.includes('Any') && !offices.includes(p.Office || '')) return false;
-      if (grades.length && !grades.includes('Any') && !grades.includes(p.Grade || '')) return false;
+      if (selectedRegions.length && !selectedRegions.includes(p.Region || '')) return false;
+      if (selectedOffices.length && !selectedOffices.includes(p.Office || '')) return false;
+      if (selectedGrades.length && !selectedGrades.includes(p.Grade || '')) return false;
       if ((p.freeSlots || 0) < minFree) return false;
       return true;
     }).sort((a,b)=>{
@@ -1220,10 +1395,15 @@
   });
 
   fmClearBtn.addEventListener('click', ()=>{
-    selectAnyOption(fmRegion);
-    populateOfficeSelect(filterOfficeSelect, 'Any');
-    selectAnyOption(filterOfficeSelect);
-    selectAnyOption(fmGrade);
+    selectedRegions = [];
+    selectedOffices = [];
+    selectedGrades = [];
+    renderMultiSelectOptions('region', multiSelectOptions.region);
+    renderMultiSelectOptions('grade', multiSelectOptions.grade);
+    updateOfficeOptions();
+    resetMultiSelectSummary('region');
+    resetMultiSelectSummary('office');
+    resetMultiSelectSummary('grade');
     fmFreeCap.value = 1;
     fmResults.innerHTML = '<div class="subtle">Cleared. Set filters and click <strong>Suggest</strong>.</div>';
   });
@@ -1909,7 +2089,6 @@
     renderPeopleTable();
     fillFilterOptions();
     populateCapacityRegions();
-    populateOfficeSelect(filterOfficeSelect, (fmRegion && fmRegion.value) || 'Any');
     populateOfficeSelect(capacityOfficeSelect, (capacityRegionSelect && capacityRegionSelect.value) || 'Any');
     updateCapacityResults();
     const hasData = (state.people || []).length>0;
