@@ -599,11 +599,9 @@
       color: var(--text-soft);
     }
 
-    /* Interactive Tree Layout Styles */
+    /* Family Tree Styles */
     .org-tree-container {
       position: relative;
-      min-height: 400px;
-      overflow: auto;
       padding: 20px;
     }
 
@@ -611,90 +609,21 @@
       position: absolute;
       top: 0;
       left: 0;
+      width: 100%;
+      height: 100%;
       pointer-events: none;
-      z-index: 1;
+      z-index: 0;
     }
 
-    .org-tree-nodes {
+    .org-tree-content {
       position: relative;
-      z-index: 2;
-    }
-
-    .org-tree-node {
-      position: absolute;
-      width: 180px;
-      min-height: 90px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      background: #141824;
-      border: 1px solid var(--border-soft);
-      text-align: center;
-      cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
-      box-sizing: border-box;
-    }
-
-    .org-tree-node:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-    }
-
-    .org-tree-node.org-highlight-manager {
-      box-shadow: 0 0 0 3px var(--accent-yellow);
-      transform: scale(1.02);
-      z-index: 10;
-    }
-
-    .org-tree-node.org-highlight-report {
-      box-shadow: 0 0 0 2px rgba(255, 212, 0, 0.5);
-      z-index: 5;
-    }
-
-    .org-tree-node.org-highlight-search {
-      animation: pulse-highlight 1.5s ease-in-out 3;
-    }
-
-    @keyframes pulse-highlight {
-      0%, 100% { box-shadow: 0 0 0 3px var(--accent-yellow); }
-      50% { box-shadow: 0 0 0 6px rgba(255, 212, 0, 0.4); }
-    }
-
-    .org-expand-btn {
-      position: absolute;
-      bottom: -12px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 1px solid var(--border-soft);
-      background: #1a1f2e;
-      color: var(--text-soft);
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s, color 0.2s, transform 0.2s;
-      z-index: 3;
-    }
-
-    .org-expand-btn:hover {
-      background: var(--accent-yellow);
-      color: #000;
-      transform: translateX(-50%) scale(1.1);
-    }
-
-    .org-expand-btn.expanded {
-      background: #2a2f3e;
+      z-index: 1;
     }
 
     .org-connection-line {
       stroke: var(--border-soft);
       stroke-width: 2;
       fill: none;
-      transition: stroke 0.2s;
     }
 
     .org-connection-line.highlighted {
@@ -702,85 +631,21 @@
       stroke-width: 2.5;
     }
 
-    /* Tree controls */
-    .org-tree-controls {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 12px;
-      padding: 8px 12px;
-      background: #0d0f17;
-      border-radius: 10px;
-      border: 1px solid var(--border-soft);
+    .org-person-card {
+      position: relative;
     }
 
-    .org-tree-search {
-      flex: 1;
-      min-width: 200px;
-      padding: 6px 10px;
-      border-radius: 8px;
-      border: 1px solid var(--border-soft);
-      background: #151823;
-      color: var(--text-main);
-      font-size: 13px;
-    }
-
-    .org-tree-search:focus {
-      outline: 2px solid rgba(255, 212, 0, 0.4);
-      outline-offset: 2px;
-    }
-
-    .org-tree-search::placeholder {
-      color: var(--text-soft);
-    }
-
-    .org-tree-btn {
-      padding: 6px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border-soft);
-      background: #151823;
-      color: var(--text-main);
-      font-size: 12px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .org-tree-btn:hover {
-      background: #1c2030;
-    }
-
-    .org-tree-btn:active {
-      background: #252a3a;
-    }
-
-    .org-node-name {
-      font-weight: 700;
-      font-size: 13px;
-      margin-bottom: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .org-node-meta {
-      color: var(--text-soft);
+    .org-level-label {
       font-size: 11px;
-      margin-bottom: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .org-node-cap {
-      display: flex;
-      justify-content: center;
-    }
-
-    .org-child-count {
-      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
       color: var(--text-soft);
-      margin-top: 2px;
+      margin-bottom: 8px;
+      padding-left: 4px;
+    }
+
+    .org-level-section {
+      margin-bottom: 16px;
     }
   </style>
 </head>
@@ -936,12 +801,6 @@
         <div class="org-group-actions">
           <button class="btn" id="orgBuildBtn" disabled>Build organigram</button>
         </div>
-      </div>
-      <div class="org-tree-controls" id="orgTreeControls" style="display:none;">
-        <input type="text" class="org-tree-search" id="orgTreeSearch" placeholder="Search person...">
-        <button class="org-tree-btn" id="orgExpandAll">Expand all</button>
-        <button class="org-tree-btn" id="orgCollapseAll">Collapse all</button>
-        <button class="org-tree-btn" id="orgBackToList">← Back to list</button>
       </div>
       <div class="org-tree-wrap">
         <div id="orgTreeRoot" class="org-tree">
@@ -1843,99 +1702,7 @@
     });
   }
 
-  function createOrgTreeCard(node, groupKey, expandedNodes, onToggleExpand) {
-    const person = node.person || node.raw || {};
-    const card = document.createElement('div');
-    card.className = 'org-tree-node';
-
-    const rawName =
-      person.FullName ||
-      person.Name ||
-      person['Full name'] ||
-      person['Full Name'] ||
-      person['Employee name'] ||
-      person['Employee'] ||
-      person.name ||
-      '';
-    const personKey = node.personKey || node.key || canonicalName(rawName);
-    card.dataset.personKey = personKey || '';
-    card.dataset.groupKey = groupKey || '';
-
-    // Position the card
-    card.style.left = node.x + 'px';
-    card.style.top = node.y + 'px';
-    card.style.width = TREE_NODE_WIDTH + 'px';
-
-    const status = (person.capStatus || '').toLowerCase();
-    const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
-    const capCls = status === 'over' ? 'cap-chip cap-over' : status === 'full' ? 'cap-chip cap-full' : 'cap-chip cap-under';
-
-    const hasChildren = node.children && node.children.length > 0;
-    const isExpanded = expandedNodes && expandedNodes.has(personKey);
-
-    let cardHTML = `
-      <div class="org-node-name">${person.FullName || person.Name || ''}</div>
-      <div class="org-node-meta">${[person.Grade || '', person.Office || ''].filter(Boolean).join(' • ')}</div>
-      <div class="org-node-cap">
-        <span class="${capCls}"><span>${statusLabel}</span><strong>${person.currentReports || 0}/${person.Capacity || 0}</strong></span>
-      </div>
-    `;
-
-    if (hasChildren) {
-      cardHTML += `<div class="org-child-count">${node.children.length} direct report${node.children.length > 1 ? 's' : ''}</div>`;
-    }
-
-    card.innerHTML = cardHTML;
-
-    // Add expand/collapse button if node has children
-    if (hasChildren) {
-      const expandBtn = document.createElement('button');
-      expandBtn.className = 'org-expand-btn' + (isExpanded ? ' expanded' : '');
-      expandBtn.textContent = isExpanded ? '−' : '+';
-      expandBtn.title = isExpanded ? 'Collapse' : `Expand (${node.children.length})`;
-      expandBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (onToggleExpand) onToggleExpand(personKey);
-      });
-      card.appendChild(expandBtn);
-    }
-
-    // Click to highlight
-    card.addEventListener('click', (e) => {
-      if (e.target.classList.contains('org-expand-btn')) return;
-      onOrgTreeNodeClick(card, groupKey, personKey);
-    });
-
-    return card;
-  }
-
-  function onOrgTreeNodeClick(card, groupKey, personKey) {
-    const treeInfo = state.orgTreesByGroup && state.orgTreesByGroup[groupKey];
-    if (!treeInfo) return;
-
-    const container = card.closest('.org-tree-container');
-    if (!container) return;
-
-    // Clear previous highlights
-    container.querySelectorAll('.org-tree-node.org-highlight-manager, .org-tree-node.org-highlight-report')
-      .forEach(el => el.classList.remove('org-highlight-manager', 'org-highlight-report'));
-
-    // Highlight clicked node
-    card.classList.add('org-highlight-manager');
-
-    // Highlight direct reports
-    const node = treeInfo.byKey.get(personKey);
-    if (node && node.children) {
-      node.children.forEach(child => {
-        const childKey = child.key || child.personKey;
-        const childCard = container.querySelector(`.org-tree-node[data-person-key="${childKey}"]`);
-        if (childCard) childCard.classList.add('org-highlight-report');
-      });
-    }
-  }
-
-  // Keep old function for backward compatibility with row-based view
-  function createOrgTreeCardLegacy(node, groupKey) {
+  function createOrgTreeCard(node, groupKey) {
     const person = node.person || node.raw || {};
     const card = document.createElement('div');
     card.className = 'org-card org-person-card';
@@ -1951,6 +1718,7 @@
       person.name ||
       '';
     const personKey = node.personKey || canonicalName(rawName);
+    console.log('Org card personKey', rawName, '=>', personKey);
     card.dataset.personKey = personKey || '';
     card.dataset.groupKey = groupKey || '';
     card.addEventListener('click', onOrgPersonCardClick);
@@ -1995,12 +1763,6 @@
     return Array.from(groups.values()).sort((a,b)=> a.label.localeCompare(b.label));
   }
 
-  // Tree layout constants
-  const TREE_NODE_WIDTH = 180;
-  const TREE_NODE_HEIGHT = 90;
-  const TREE_H_GAP = 20;
-  const TREE_V_GAP = 50;
-
   function buildHierarchyForGroup(groupPeople){
     const nodes = groupPeople.map(p => ({
       person: p,
@@ -2008,54 +1770,24 @@
       managerKey: canonicalName(p.Manager),
       children: [],
       depth: 0,
-      x: 0,
-      y: 0,
-      subtreeWidth: TREE_NODE_WIDTH,
-      expanded: false,
-      visible: false,
-      parent: null,
     }));
 
     const byKey = new Map();
     nodes.forEach(n => { if (n.key) byKey.set(n.key, n); });
 
-    // Link children to managers and set parent references
     nodes.forEach(node => {
       const mgr = node.managerKey && byKey.get(node.managerKey);
-      if (mgr && mgr !== node) {
-        mgr.children.push(node);
-        node.parent = mgr;
-      }
+      if (mgr && mgr !== node) mgr.children.push(node);
     });
 
-    // Sort children by grade then name for consistent ordering
-    nodes.forEach(node => {
-      node.children.sort((a, b) => {
-        const ga = gradeIndex(a.person.Grade);
-        const gb = gradeIndex(b.person.Grade);
-        if (ga !== gb) return ga - gb;
-        return (a.person.FullName || '').localeCompare(b.person.FullName || '');
-      });
-    });
-
-    // Find roots: people whose manager is not in this group
     const roots = nodes.filter(node => {
       const mgr = node.managerKey && byKey.get(node.managerKey);
       return !mgr || mgr === node;
     });
 
-    // Sort roots by grade then name
-    roots.sort((a, b) => {
-      const ga = gradeIndex(a.person.Grade);
-      const gb = gradeIndex(b.person.Grade);
-      if (ga !== gb) return ga - gb;
-      return (a.person.FullName || '').localeCompare(b.person.FullName || '');
-    });
-
-    // Compute depth via BFS from roots (based on actual parent-child relationships)
     const queue = [];
     const visited = new Set();
-    roots.forEach(root => { root.depth = 0; root.visible = true; queue.push(root); visited.add(root); });
+    roots.forEach(root => { root.depth = 0; queue.push(root); visited.add(root); });
 
     while(queue.length){
       const current = queue.shift();
@@ -2068,357 +1800,194 @@
       });
     }
 
-    // Any unvisited nodes become additional roots
     nodes.forEach(node => {
       if (!visited.has(node)){
         node.depth = 0;
-        node.visible = true;
         roots.push(node);
       }
     });
 
-    return { nodes, roots, byKey };
-  }
-
-  /**
-   * Compute tree layout positions
-   * Uses a recursive algorithm:
-   * 1. Compute subtree widths bottom-up
-   * 2. Position nodes top-down, centering parents above children
-   */
-  function computeTreeLayout(roots, expandedNodes) {
-    // First pass: compute subtree widths bottom-up
-    function computeSubtreeWidth(node) {
-      const isExpanded = expandedNodes.has(node.key);
-      const visibleChildren = isExpanded ? node.children : [];
-
-      if (visibleChildren.length === 0) {
-        node.subtreeWidth = TREE_NODE_WIDTH;
-        return node.subtreeWidth;
-      }
-
-      let totalChildrenWidth = 0;
-      visibleChildren.forEach((child, i) => {
-        totalChildrenWidth += computeSubtreeWidth(child);
-        if (i < visibleChildren.length - 1) {
-          totalChildrenWidth += TREE_H_GAP;
-        }
-      });
-
-      node.subtreeWidth = Math.max(TREE_NODE_WIDTH, totalChildrenWidth);
-      return node.subtreeWidth;
-    }
-
-    // Second pass: position nodes top-down
-    function positionNode(node, xStart, depth) {
-      node.depth = depth;
-      node.y = depth * (TREE_NODE_HEIGHT + TREE_V_GAP);
-
-      const isExpanded = expandedNodes.has(node.key);
-      const visibleChildren = isExpanded ? node.children : [];
-
-      if (visibleChildren.length === 0) {
-        // Leaf node or collapsed: center within allocated space
-        node.x = xStart + (node.subtreeWidth - TREE_NODE_WIDTH) / 2;
-      } else {
-        // Position children first
-        let childX = xStart;
-        visibleChildren.forEach(child => {
-          positionNode(child, childX, depth + 1);
-          child.visible = true;
-          childX += child.subtreeWidth + TREE_H_GAP;
-        });
-
-        // Center parent above children
-        const firstChild = visibleChildren[0];
-        const lastChild = visibleChildren[visibleChildren.length - 1];
-        const childrenCenter = (firstChild.x + lastChild.x + TREE_NODE_WIDTH) / 2;
-        node.x = childrenCenter - TREE_NODE_WIDTH / 2;
-      }
-    }
-
-    // Hide all nodes first
-    function hideAllDescendants(node) {
-      node.visible = false;
-      node.children.forEach(hideAllDescendants);
-    }
-
-    // Reset visibility
-    roots.forEach(root => {
-      hideAllDescendants(root);
-      root.visible = true;
+    nodes.forEach(node => {
+      node.depth = gradeDepthIndex(node.person.Grade || node.person.GradeLevel || '');
     });
 
-    // Mark visible nodes based on expanded state
-    function markVisible(node) {
-      node.visible = true;
-      if (expandedNodes.has(node.key)) {
-        node.children.forEach(markVisible);
-      }
-    }
-    roots.forEach(markVisible);
-
-    // Compute widths for all roots
-    let totalWidth = 0;
-    roots.forEach((root, i) => {
-      computeSubtreeWidth(root);
-      totalWidth += root.subtreeWidth;
-      if (i < roots.length - 1) totalWidth += TREE_H_GAP * 2;
-    });
-
-    // Position all roots
-    let xOffset = 20; // Left padding
-    roots.forEach(root => {
-      positionNode(root, xOffset, 0);
-      xOffset += root.subtreeWidth + TREE_H_GAP * 2;
-    });
-
-    return { totalWidth: xOffset + 20, totalHeight: getMaxDepth(roots) * (TREE_NODE_HEIGHT + TREE_V_GAP) + TREE_NODE_HEIGHT + 40 };
+    return { nodes, roots };
   }
-
-  function getMaxDepth(roots) {
-    let maxDepth = 0;
-    function traverse(node, depth) {
-      if (node.visible) {
-        maxDepth = Math.max(maxDepth, depth);
-        node.children.forEach(child => traverse(child, depth + 1));
-      }
-    }
-    roots.forEach(root => traverse(root, 0));
-    return maxDepth;
-  }
-
-  let currentTreeGroupKey = null;
 
   function renderOrgTree(groupKey){
     const detail = document.getElementById('org-tree-detail');
-    const controls = document.getElementById('orgTreeControls');
     if (!detail) return;
-
-    currentTreeGroupKey = groupKey;
 
     const groups = buildOrganigramGroups();
     const group = groups.find(g => g.key === groupKey);
     if (!group){
       detail.innerHTML = '<p class="subtle">No data for this group.</p>';
-      if (controls) controls.style.display = 'none';
       return;
     }
 
-    // Show tree controls
-    if (controls) controls.style.display = 'flex';
+    const { nodes, roots } = buildHierarchyForGroup(group.people);
 
-    const { nodes, roots, byKey } = buildHierarchyForGroup(group.people);
+    const nodeByName = new Map();
+    nodes.forEach(node => {
+      const person = node.person || node.raw || {};
+      const rawName =
+        person.FullName ||
+        person.Name ||
+        person['Full name'] ||
+        person['Full Name'] ||
+        person['Employee name'] ||
+        person['Employee'] ||
+        person.name ||
+        '';
 
-    // Initialize expandedNodes set if not exists
+      const key = canonicalName(rawName);
+      if (key) {
+        nodeByName.set(key, node);
+        node.personKey = key;
+      }
+    });
+
+    if (!window.state) window.state = {};
     if (!state.orgTreesByGroup) state.orgTreesByGroup = {};
-    if (!state.orgTreesByGroup[groupKey]) {
-      state.orgTreesByGroup[groupKey] = {
-        nodes,
-        roots,
-        byKey,
-        expandedNodes: new Set()
-      };
-    } else {
-      // Update nodes/roots but preserve expandedNodes
-      state.orgTreesByGroup[groupKey].nodes = nodes;
-      state.orgTreesByGroup[groupKey].roots = roots;
-      state.orgTreesByGroup[groupKey].byKey = byKey;
-    }
+    state.orgTreesByGroup[groupKey] = { nodes, roots, nodeByName };
 
-    const treeInfo = state.orgTreesByGroup[groupKey];
-    const expandedNodes = treeInfo.expandedNodes;
+    const levels = new Map();
+    let maxDepth = 0;
+    nodes.forEach(n => {
+      const d = n.depth || 0;
+      if (!levels.has(d)) levels.set(d, []);
+      levels.get(d).push(n);
+      if (d > maxDepth) maxDepth = d;
+    });
 
-    // Compute layout
-    const { totalWidth, totalHeight } = computeTreeLayout(roots, expandedNodes);
+    levels.forEach(levelNodes => {
+      levelNodes.sort((a,b)=>{
+        const ga = gradeIndex(a.person.Grade);
+        const gb = gradeIndex(b.person.Grade);
+        if (ga !== gb) return ga - gb;
+        return (a.person.FullName || a.person.Name || '').localeCompare(b.person.FullName || b.person.Name || '');
+      });
+    });
 
     detail.innerHTML = '';
+    const title = document.createElement('h3');
+    title.textContent = `${group.label} – Hierarchy`;
+    detail.appendChild(title);
 
-    // Create tree container
+    if (!nodes.length){
+      detail.innerHTML += '<div class="subtle">No people in this group.</div>';
+      return;
+    }
+
+    // Create tree container with SVG layer
     const treeContainer = document.createElement('div');
     treeContainer.className = 'org-tree-container';
-    treeContainer.style.width = Math.max(totalWidth, 600) + 'px';
-    treeContainer.style.height = totalHeight + 'px';
-    treeContainer.setAttribute('data-group-key', groupKey);
 
-    // Create SVG layer for connection lines
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'org-tree-svg');
-    svg.setAttribute('width', totalWidth);
-    svg.setAttribute('height', totalHeight);
     treeContainer.appendChild(svg);
 
-    // Create nodes container
-    const nodesContainer = document.createElement('div');
-    nodesContainer.className = 'org-tree-nodes';
-    treeContainer.appendChild(nodesContainer);
+    const treeContent = document.createElement('div');
+    treeContent.className = 'org-tree-content';
 
-    // Toggle expand handler
-    const onToggleExpand = (personKey) => {
-      toggleNodeExpand(groupKey, personKey);
+    const groupContainer = document.createElement('div');
+    groupContainer.className = 'org-group org-tree';
+    groupContainer.setAttribute('data-group-key', groupKey);
+
+    // Grade level labels
+    const gradeLevelLabels = {
+      0: 'Senior Director',
+      1: 'Director',
+      2: 'Project Director',
+      3: 'Associate Director',
+      4: 'Executive Cost Manager',
+      5: 'Senior Cost Manager',
+      6: 'Cost Manager',
+      7: 'Assistant Cost Manager',
+      8: 'Graduate Cost Manager',
+      9: 'Trainee Cost Manager'
     };
 
-    // Render visible nodes
-    function renderNodes(nodeList) {
-      nodeList.forEach(node => {
-        if (node.visible) {
-          const card = createOrgTreeCard(node, groupKey, expandedNodes, onToggleExpand);
-          nodesContainer.appendChild(card);
-          // Render children if expanded
-          if (expandedNodes.has(node.key) && node.children.length > 0) {
-            renderNodes(node.children);
-          }
-        }
+    for (let depth = 0; depth <= maxDepth; depth++){
+      const levelNodes = levels.get(depth) || [];
+      if (!levelNodes.length) continue;
+
+      const section = document.createElement('div');
+      section.className = 'org-level-section';
+
+      const label = document.createElement('div');
+      label.className = 'org-level-label';
+      label.textContent = gradeLevelLabels[depth] || `Level ${depth}`;
+      section.appendChild(label);
+
+      const row = document.createElement('div');
+      row.className = 'org-level-row';
+      levelNodes.forEach(node => {
+        row.appendChild(createOrgTreeCard(node, groupKey));
       });
+      section.appendChild(row);
+      groupContainer.appendChild(section);
     }
 
-    renderNodes(roots);
-
-    // Render connection lines
-    renderConnectionLines(svg, roots, expandedNodes);
-
+    treeContent.appendChild(groupContainer);
+    treeContainer.appendChild(treeContent);
     detail.appendChild(treeContainer);
-  }
 
-  function toggleNodeExpand(groupKey, personKey) {
-    const treeInfo = state.orgTreesByGroup && state.orgTreesByGroup[groupKey];
-    if (!treeInfo) return;
-
-    const expandedNodes = treeInfo.expandedNodes;
-    if (expandedNodes.has(personKey)) {
-      expandedNodes.delete(personKey);
-    } else {
-      expandedNodes.add(personKey);
-    }
-
-    // Re-render tree
-    renderOrgTree(groupKey);
-  }
-
-  function expandAllNodes(groupKey) {
-    const treeInfo = state.orgTreesByGroup && state.orgTreesByGroup[groupKey];
-    if (!treeInfo) return;
-
-    const expandedNodes = treeInfo.expandedNodes;
-    // Add all nodes with children to expandedNodes
-    treeInfo.nodes.forEach(node => {
-      if (node.children && node.children.length > 0) {
-        expandedNodes.add(node.key);
-      }
+    // Draw connection lines after DOM is rendered
+    requestAnimationFrame(() => {
+      drawConnectionLines(treeContainer, svg, nodes, nodeByName);
     });
 
-    renderOrgTree(groupKey);
+    console.log('Organigram tree', group.label, 'nodes:', nodes.length, 'expected:', group.people.length);
   }
 
-  function collapseAllNodes(groupKey) {
-    const treeInfo = state.orgTreesByGroup && state.orgTreesByGroup[groupKey];
-    if (!treeInfo) return;
+  function drawConnectionLines(container, svg, nodes, nodeByName) {
+    const containerRect = container.getBoundingClientRect();
 
-    treeInfo.expandedNodes.clear();
-    renderOrgTree(groupKey);
-  }
-
-  function searchAndExpandPath(groupKey, query) {
-    const treeInfo = state.orgTreesByGroup && state.orgTreesByGroup[groupKey];
-    if (!treeInfo || !query) return;
-
-    const queryLower = query.toLowerCase().trim();
-    if (!queryLower) return;
-
-    // Find matching nodes
-    const matches = treeInfo.nodes.filter(node => {
-      const person = node.person || {};
-      const name = (person.FullName || person.Name || '').toLowerCase();
-      const grade = (person.Grade || '').toLowerCase();
-      const office = (person.Office || '').toLowerCase();
-      return name.includes(queryLower) || grade.includes(queryLower) || office.includes(queryLower);
-    });
-
-    if (matches.length === 0) return;
-
-    const expandedNodes = treeInfo.expandedNodes;
-
-    // Expand path to each match
-    matches.forEach(match => {
-      let current = match.parent;
-      while (current) {
-        expandedNodes.add(current.key);
-        current = current.parent;
-      }
-    });
-
-    // Re-render
-    renderOrgTree(groupKey);
-
-    // Highlight and scroll to first match
-    setTimeout(() => {
-      const firstMatch = matches[0];
-      const container = document.querySelector('.org-tree-container');
-      if (!container) return;
-
-      const matchCard = container.querySelector(`.org-tree-node[data-person-key="${firstMatch.key}"]`);
-      if (matchCard) {
-        // Clear previous search highlights
-        container.querySelectorAll('.org-highlight-search').forEach(el => el.classList.remove('org-highlight-search'));
-
-        // Highlight all matches
-        matches.forEach(m => {
-          const card = container.querySelector(`.org-tree-node[data-person-key="${m.key}"]`);
-          if (card) card.classList.add('org-highlight-search');
-        });
-
-        // Scroll to first match
-        matchCard.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-      }
-    }, 100);
-  }
-
-  function renderConnectionLines(svg, roots, expandedNodes) {
-    // Clear existing lines
+    // Set SVG size to match container
+    svg.setAttribute('width', container.scrollWidth);
+    svg.setAttribute('height', container.scrollHeight);
     svg.innerHTML = '';
 
-    function drawLines(node) {
-      if (!node.visible) return;
+    nodes.forEach(node => {
+      const person = node.person || {};
+      const managerKey = node.managerKey;
 
-      const isExpanded = expandedNodes.has(node.key);
-      if (!isExpanded || !node.children || node.children.length === 0) return;
+      if (!managerKey) return;
 
-      const parentCenterX = node.x + TREE_NODE_WIDTH / 2;
-      const parentBottomY = node.y + TREE_NODE_HEIGHT;
+      const managerNode = nodeByName.get(managerKey);
+      if (!managerNode) return;
 
-      node.children.forEach(child => {
-        if (!child.visible) return;
+      // Find the card elements
+      const childCard = container.querySelector(`.org-person-card[data-person-key="${node.personKey}"]`);
+      const parentCard = container.querySelector(`.org-person-card[data-person-key="${managerNode.personKey}"]`);
 
-        const childCenterX = child.x + TREE_NODE_WIDTH / 2;
-        const childTopY = child.y;
+      if (!childCard || !parentCard) return;
 
-        // Draw step-line: vertical down, horizontal, vertical down
-        const midY = parentBottomY + (childTopY - parentBottomY) / 2;
+      const childRect = childCard.getBoundingClientRect();
+      const parentRect = parentCard.getBoundingClientRect();
 
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        const d = `M ${parentCenterX} ${parentBottomY} L ${parentCenterX} ${midY} L ${childCenterX} ${midY} L ${childCenterX} ${childTopY}`;
-        path.setAttribute('d', d);
-        path.setAttribute('class', 'org-connection-line');
-        svg.appendChild(path);
+      // Calculate positions relative to container
+      const childCenterX = childRect.left - containerRect.left + childRect.width / 2;
+      const childTopY = childRect.top - containerRect.top;
+      const parentCenterX = parentRect.left - containerRect.left + parentRect.width / 2;
+      const parentBottomY = parentRect.top - containerRect.top + parentRect.height;
 
-        // Recursively draw lines for children
-        drawLines(child);
-      });
-    }
+      // Draw step-line path
+      const midY = parentBottomY + (childTopY - parentBottomY) / 2;
 
-    roots.forEach(drawLines);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const d = `M ${parentCenterX} ${parentBottomY} L ${parentCenterX} ${midY} L ${childCenterX} ${midY} L ${childCenterX} ${childTopY}`;
+      path.setAttribute('d', d);
+      path.setAttribute('class', 'org-connection-line');
+      path.setAttribute('data-parent', managerNode.personKey);
+      path.setAttribute('data-child', node.personKey);
+      svg.appendChild(path);
+    });
   }
 
   function renderOrganigram(){
     const people = state.people || [];
-
-    // Hide tree controls when showing list view
-    const treeControls = document.getElementById('orgTreeControls');
-    if (treeControls) treeControls.style.display = 'none';
-
-    // Reset current group key
-    currentTreeGroupKey = null;
-
     if (!people.length){
       orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>';
       return;
@@ -2587,54 +2156,6 @@
   }
 
   orgBuildBtn.addEventListener('click', renderOrganigram);
-
-  // Tree controls event listeners
-  const orgTreeSearch = document.getElementById('orgTreeSearch');
-  const orgExpandAll = document.getElementById('orgExpandAll');
-  const orgCollapseAll = document.getElementById('orgCollapseAll');
-  const orgBackToList = document.getElementById('orgBackToList');
-  const orgTreeControls = document.getElementById('orgTreeControls');
-
-  if (orgExpandAll) {
-    orgExpandAll.addEventListener('click', () => {
-      if (currentTreeGroupKey) expandAllNodes(currentTreeGroupKey);
-    });
-  }
-
-  if (orgCollapseAll) {
-    orgCollapseAll.addEventListener('click', () => {
-      if (currentTreeGroupKey) collapseAllNodes(currentTreeGroupKey);
-    });
-  }
-
-  if (orgTreeSearch) {
-    let searchTimeout;
-    orgTreeSearch.addEventListener('input', (e) => {
-      clearTimeout(searchTimeout);
-      const query = e.target.value;
-      searchTimeout = setTimeout(() => {
-        if (currentTreeGroupKey && query.trim()) {
-          searchAndExpandPath(currentTreeGroupKey, query);
-        }
-      }, 300);
-    });
-
-    orgTreeSearch.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && currentTreeGroupKey) {
-        e.preventDefault();
-        searchAndExpandPath(currentTreeGroupKey, e.target.value);
-      }
-    });
-  }
-
-  if (orgBackToList) {
-    orgBackToList.addEventListener('click', () => {
-      currentTreeGroupKey = null;
-      if (orgTreeControls) orgTreeControls.style.display = 'none';
-      if (orgTreeSearch) orgTreeSearch.value = '';
-      renderOrganigram();
-    });
-  }
 
   // --- Tabs --------------------------------------------------------------
   document.querySelectorAll('.tab-btn').forEach(btn=>{
