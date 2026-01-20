@@ -620,19 +620,52 @@
       z-index: 1;
     }
 
+    /* Connection lines - hidden by default */
     .org-connection-line {
       stroke: var(--border-soft);
       stroke-width: 2;
       fill: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
     }
 
-    .org-connection-line.highlighted {
+    /* Line to manager - blue/cyan */
+    .org-connection-line.show-manager {
+      opacity: 1;
+      stroke: #4ecdc4;
+      stroke-width: 3;
+    }
+
+    /* Line to direct report - yellow */
+    .org-connection-line.show-report {
+      opacity: 1;
       stroke: var(--accent-yellow);
-      stroke-width: 2.5;
+      stroke-width: 3;
     }
 
     .org-person-card {
       position: relative;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    /* Selected person - yellow */
+    .org-person-card.org-highlight-selected {
+      box-shadow: 0 0 0 4px var(--accent-yellow);
+      transform: scale(1.05);
+      z-index: 10;
+    }
+
+    /* Manager of selected person - cyan/teal */
+    .org-person-card.org-highlight-manager {
+      box-shadow: 0 0 0 4px #4ecdc4;
+      transform: scale(1.03);
+      z-index: 5;
+    }
+
+    /* Direct report of selected person - yellow (lighter) */
+    .org-person-card.org-highlight-report {
+      box-shadow: 0 0 0 3px rgba(255, 212, 0, 0.7);
+      z-index: 5;
     }
 
     .org-level-label {
@@ -647,6 +680,31 @@
     .org-level-section {
       margin-bottom: 16px;
     }
+
+    /* Legend for the relationship colors */
+    .org-legend {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 12px;
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .org-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .org-legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    .org-legend-color.selected { background: var(--accent-yellow); }
+    .org-legend-color.manager { background: #4ecdc4; }
+    .org-legend-color.report { background: rgba(255, 212, 0, 0.7); }
   </style>
 </head>
 <body>
@@ -1651,53 +1709,67 @@
     const groupKey = card.dataset.groupKey;
     const personKey = (card.dataset.personKey || '').toLowerCase();
 
-    console.log('Org card clicked:', { groupKey, personKey, dataset: card.dataset });
-
     if (!groupKey || !personKey) return;
     const treeInfo = state.orgTreesByGroup && state.orgTreesByGroup[groupKey];
-    if (!treeInfo) {
-      console.warn('No tree info for groupKey', groupKey);
-      return;
-    }
+    if (!treeInfo) return;
 
     const node = treeInfo.nodeByName.get(personKey);
-    if (!node) {
-      console.warn('No node found for personKey', personKey);
-      return;
+    if (!node) return;
+
+    const container = card.closest('.org-tree-container');
+    if (!container) return;
+
+    const svg = container.querySelector('.org-tree-svg');
+
+    // Clear all previous highlights
+    container.querySelectorAll('.org-person-card.org-highlight-selected, .org-person-card.org-highlight-manager, .org-person-card.org-highlight-report')
+      .forEach(el => el.classList.remove('org-highlight-selected', 'org-highlight-manager', 'org-highlight-report'));
+
+    // Clear all line highlights
+    if (svg) {
+      svg.querySelectorAll('.org-connection-line')
+        .forEach(line => line.classList.remove('show-manager', 'show-report'));
     }
 
-    const groupRoot =
-      document.querySelector(`.org-group[data-group-key="${groupKey}"]`) ||
-      document.querySelector('.org-group');
-    if (!groupRoot) return;
+    // Highlight the clicked person
+    card.classList.add('org-highlight-selected');
 
-    groupRoot
-      .querySelectorAll(
-        '.org-person-card.org-highlight-manager, .org-person-card.org-highlight-report'
-      )
-      .forEach(el => el.classList.remove('org-highlight-manager', 'org-highlight-report'));
+    // Find and highlight their manager
+    const managerKey = node.managerKey;
+    if (managerKey) {
+      const managerNode = treeInfo.nodeByName.get(managerKey);
+      if (managerNode) {
+        const managerCard = container.querySelector(`.org-person-card[data-person-key="${managerKey}"]`);
+        if (managerCard) {
+          managerCard.classList.add('org-highlight-manager');
+        }
+        // Highlight the line to manager
+        if (svg) {
+          const managerLine = svg.querySelector(`.org-connection-line[data-child="${personKey}"]`);
+          if (managerLine) {
+            managerLine.classList.add('show-manager');
+          }
+        }
+      }
+    }
 
-    card.classList.add('org-highlight-manager');
-
+    // Find and highlight direct reports
     (node.children || []).forEach(child => {
       const cp = child.person || child.raw || {};
-      const childRaw =
-        cp.FullName ||
-        cp.Name ||
-        cp['Full name'] ||
-        cp['Full Name'] ||
-        cp['Employee name'] ||
-        cp['Employee'] ||
-        cp.name ||
-        '';
+      const childRaw = cp.FullName || cp.Name || cp['Full name'] || cp['Full Name'] || cp['Employee name'] || cp['Employee'] || cp.name || '';
       const childKey = canonicalName(childRaw);
       if (!childKey) return;
 
-      const childCard = groupRoot.querySelector(
-        `.org-person-card[data-person-key="${childKey}"]`
-      );
+      const childCard = container.querySelector(`.org-person-card[data-person-key="${childKey}"]`);
       if (childCard) {
         childCard.classList.add('org-highlight-report');
+      }
+      // Highlight the line to this report
+      if (svg) {
+        const reportLine = svg.querySelector(`.org-connection-line[data-child="${childKey}"]`);
+        if (reportLine) {
+          reportLine.classList.add('show-report');
+        }
       }
     });
   }
@@ -1878,6 +1950,17 @@
       detail.innerHTML += '<div class="subtle">No people in this group.</div>';
       return;
     }
+
+    // Add legend
+    const legend = document.createElement('div');
+    legend.className = 'org-legend';
+    legend.innerHTML = `
+      <span class="subtle">Click a person to see relationships:</span>
+      <div class="org-legend-item"><div class="org-legend-color selected"></div> Selected</div>
+      <div class="org-legend-item"><div class="org-legend-color manager"></div> Their Manager</div>
+      <div class="org-legend-item"><div class="org-legend-color report"></div> Their Reports</div>
+    `;
+    detail.appendChild(legend);
 
     // Create tree container with SVG layer
     const treeContainer = document.createElement('div');
