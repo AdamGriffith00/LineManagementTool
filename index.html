@@ -7,6 +7,10 @@
 
   <!-- SheetJS for XLSX/XLS support -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- html2canvas for PNG export -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <style>
     :root {
@@ -89,6 +93,229 @@
     .brand-title {
       font-size: 18px;
       font-weight: 500;
+    }
+
+    .info-btn {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid var(--text-soft);
+      background: transparent;
+      color: var(--text-soft);
+      font-size: 12px;
+      font-weight: 700;
+      font-style: italic;
+      cursor: pointer;
+      margin-left: 8px;
+      transition: all 0.2s;
+    }
+
+    .info-btn:hover {
+      background: var(--accent-yellow);
+      border-color: var(--accent-yellow);
+      color: #000;
+    }
+
+    .info-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    .info-modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .info-modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .info-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .info-modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-yellow);
+    }
+
+    .info-modal-close {
+      background: none;
+      border: none;
+      color: var(--text-soft);
+      font-size: 24px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .info-modal-close:hover {
+      color: var(--text-main);
+    }
+
+    .info-section {
+      margin-bottom: 16px;
+    }
+
+    .info-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .info-section-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .info-section-list li {
+      font-size: 12px;
+      color: var(--text-soft);
+      padding: 4px 0;
+      padding-left: 16px;
+      position: relative;
+    }
+
+    .info-section-list li::before {
+      content: '•';
+      position: absolute;
+      left: 4px;
+      color: var(--accent-yellow);
+    }
+
+    /* Change Log Modal */
+    .changelog-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1001;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    .changelog-modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .changelog-modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .changelog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .changelog-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-yellow);
+    }
+
+    .changelog-close {
+      background: none;
+      border: none;
+      color: var(--text-soft);
+      font-size: 24px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .changelog-close:hover {
+      color: var(--text-main);
+    }
+
+    .changelog-section {
+      margin-bottom: 16px;
+    }
+
+    .changelog-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .changelog-section-title.added { color: #55d68a; }
+    .changelog-section-title.removed { color: #ff9b8f; }
+    .changelog-section-title.changed { color: #f5d06a; }
+
+    .changelog-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-soft);
+    }
+
+    .changelog-list li {
+      padding: 4px 0 4px 16px;
+      position: relative;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .changelog-list li:last-child {
+      border-bottom: none;
+    }
+
+    .changelog-list li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--text-soft);
+    }
+
+    .changelog-empty {
+      text-align: center;
+      color: var(--text-soft);
+      font-size: 13px;
+      padding: 20px;
     }
 
     .top-actions {
@@ -392,6 +619,23 @@
     }
     tbody tr:hover { background: #171b27; }
 
+    /* Row highlighting for issues */
+    tbody tr.row-over-capacity {
+      background: rgba(255, 107, 107, 0.1);
+    }
+    tbody tr.row-over-capacity td:first-child {
+      border-left: 3px solid #ff6b6b;
+    }
+    tbody tr.row-orphan {
+      background: rgba(255, 193, 7, 0.1);
+    }
+    tbody tr.row-orphan td:first-child {
+      border-left: 3px solid #ffc107;
+    }
+    tbody tr.row-over-capacity.row-orphan {
+      background: rgba(255, 107, 107, 0.15);
+    }
+
     /* Capacity chips --------------------------------------------------- */
 
     .cap-chip {
@@ -465,6 +709,44 @@
       color: var(--text-soft);
     }
 
+    .recommend-score {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+
+    .recommend-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(46, 204, 113, 0.15);
+      color: #55d68a;
+      font-weight: 600;
+    }
+
+    .recommend-badge.high {
+      background: rgba(46, 204, 113, 0.2);
+      color: #4fec94;
+    }
+
+    .recommend-badge.medium {
+      background: rgba(241, 196, 15, 0.15);
+      color: #f5d06a;
+    }
+
+    .recommend-badge.low {
+      background: rgba(255, 107, 107, 0.15);
+      color: #ff9b8f;
+    }
+
+    .recommend-reasons {
+      font-size: 9px;
+      color: var(--text-soft);
+      text-align: right;
+      max-width: 150px;
+    }
+
     /* Organigram --------------------------------------------------- */
 
     .org-controls {
@@ -482,6 +764,112 @@
       background: var(--bg-card-soft);
       padding: 8px 10px;
       font-size: 12px;
+      position: relative;
+    }
+
+    .org-tree-inner {
+      transform-origin: top left;
+      transition: transform 0.2s ease;
+    }
+
+    #orgTreeRoot {
+      transform-origin: top left;
+      transition: transform 0.2s ease;
+    }
+
+    .zoom-controls {
+      display: flex;
+      gap: 4px;
+      margin-left: 16px;
+      align-items: flex-end;
+    }
+
+    .zoom-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid var(--border-soft);
+      background: var(--bg-card);
+      color: var(--text-main);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .zoom-btn:hover {
+      background: var(--accent-yellow);
+      color: #000;
+      border-color: var(--accent-yellow);
+    }
+
+    .zoom-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .zoom-btn:disabled:hover {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border-color: var(--border-soft);
+    }
+
+    .zoom-level {
+      font-size: 11px;
+      color: var(--text-soft);
+      min-width: 40px;
+      text-align: center;
+      line-height: 32px;
+    }
+
+    .capacity-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 16px;
+      cursor: pointer;
+      font-size: 11px;
+      color: var(--text-soft);
+    }
+
+    .capacity-toggle input {
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+
+    .capacity-toggle:hover {
+      color: var(--text-main);
+    }
+
+    .export-controls {
+      display: flex;
+      gap: 6px;
+      margin-left: 16px;
+      align-items: flex-end;
+    }
+
+    .export-controls .btn {
+      padding: 6px 12px;
+      font-size: 11px;
+    }
+
+    /* Capacity color mode */
+    .org-tree.color-by-capacity .org-person-card.cap-status-over {
+      background: rgba(231, 76, 60, 0.15);
+      border-color: rgba(231, 76, 60, 0.5);
+    }
+
+    .org-tree.color-by-capacity .org-person-card.cap-status-full {
+      background: rgba(241, 196, 15, 0.15);
+      border-color: rgba(241, 196, 15, 0.5);
+    }
+
+    .org-tree.color-by-capacity .org-person-card.cap-status-under {
+      background: rgba(46, 204, 113, 0.15);
+      border-color: rgba(46, 204, 113, 0.5);
     }
 
     .org-group {
@@ -709,14 +1097,9 @@
       z-index: 5;
     }
 
-    /* Over-capacity manager - red warning */
+    /* Over-capacity manager - subtle indicator on organigram */
     .org-person-card.org-over-capacity {
-      border: 2px solid #ff6b6b;
-      box-shadow: 0 0 12px rgba(255, 107, 107, 0.4);
-    }
-
-    .org-person-card.org-over-capacity .org-name {
-      color: #ff6b6b;
+      border-left: 3px solid #ff6b6b;
     }
 
     /* Team size badge */
@@ -858,6 +1241,7 @@
     <div class="brand">
       <div class="brand-logo">gleeds</div>
       <div class="brand-title">Infrastructure Cost Management Line Management</div>
+      <button class="info-btn" id="infoBtn" title="About this tool">i</button>
     </div>
     <div class="top-actions">
       <button class="btn-top" id="btnLoad">Load CSV/XLSX…</button>
@@ -959,6 +1343,11 @@
         <div class="card" id="manager-capacity-panel">
           <div class="pill-label">Line managers by region</div>
           <div class="field">
+            <div class="field-label">Recommend for person (optional)</div>
+            <input type="text" id="capacity-recommend-for" placeholder="Type name..." list="capacity-person-list">
+            <datalist id="capacity-person-list"></datalist>
+          </div>
+          <div class="field">
             <div class="field-label">Region</div>
             <select id="capacity-region">
               <option value="Any">Any region</option>
@@ -1015,6 +1404,20 @@
           <datalist id="orgPersonList"></datalist>
         </div>
         <button class="btn btn-ghost" id="orgClearBtn" style="align-self:flex-end;">Clear</button>
+        <div class="zoom-controls">
+          <button class="zoom-btn" id="zoomOut" title="Zoom out">−</button>
+          <span class="zoom-level" id="zoomLevel">100%</span>
+          <button class="zoom-btn" id="zoomIn" title="Zoom in">+</button>
+          <button class="zoom-btn" id="zoomReset" title="Reset zoom">⟲</button>
+        </div>
+        <label class="capacity-toggle" title="Color cards by capacity status">
+          <input type="checkbox" id="colorByCapacity">
+          <span class="toggle-label">Color by capacity</span>
+        </label>
+        <div class="export-controls">
+          <button class="btn btn-ghost" id="exportOrgPng" title="Export as PNG">Export PNG</button>
+          <button class="btn btn-ghost" id="exportOrgPdf" title="Export as PDF">Export PDF</button>
+        </div>
       </div>
       <div class="org-tree-wrap">
         <div id="orgTreeRoot" class="org-tree">
@@ -1023,6 +1426,79 @@
       </div>
     </div>
   </section>
+</div>
+
+<!-- Info Modal -->
+<div class="info-modal-overlay" id="infoModal">
+  <div class="info-modal">
+    <div class="info-modal-header">
+      <div class="info-modal-title">Line Management Tool Features</div>
+      <button class="info-modal-close" id="infoModalClose">×</button>
+    </div>
+
+    <div class="info-section">
+      <div class="info-section-title">📊 Overview Tab</div>
+      <ul class="info-section-list">
+        <li>View all employees in a searchable, sortable table</li>
+        <li>See capacity summary (under/at/over capacity managers)</li>
+        <li>Automatic detection of orphans (manager not in system)</li>
+        <li>Automatic detection of circular reporting chains</li>
+      </ul>
+    </div>
+
+    <div class="info-section">
+      <div class="info-section-title">🔍 Find a Manager</div>
+      <ul class="info-section-list">
+        <li>Filter by region, office, and grade</li>
+        <li>Find managers with available capacity</li>
+        <li>Set minimum free capacity requirement</li>
+      </ul>
+    </div>
+
+    <div class="info-section">
+      <div class="info-section-title">👥 Line Managers by Region</div>
+      <ul class="info-section-list">
+        <li>Search managers by region and office</li>
+        <li>Filter by capacity status</li>
+        <li>Quick overview of manager availability</li>
+      </ul>
+    </div>
+
+    <div class="info-section">
+      <div class="info-section-title">🌳 Organigram Tab</div>
+      <ul class="info-section-list">
+        <li>View hierarchy by Overall, Region, or Office</li>
+        <li>Find Person: See anyone's complete reporting chain (managers above, reports below)</li>
+        <li>Click any person to highlight their manager and direct reports</li>
+        <li>Connection lines show reporting relationships</li>
+        <li>Over-capacity managers highlighted in red</li>
+        <li>Team size badges show total direct + indirect reports</li>
+        <li>Out-of-group info popup when manager/reports are in different regions</li>
+      </ul>
+    </div>
+
+    <div class="info-section">
+      <div class="info-section-title">📁 Data Management</div>
+      <ul class="info-section-list">
+        <li>Import CSV or Excel files</li>
+        <li>Export data as CSV</li>
+        <li>Clear stored data anytime</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Change Log Modal -->
+<div class="changelog-modal-overlay" id="changelogModal">
+  <div class="changelog-modal">
+    <div class="changelog-header">
+      <div class="changelog-title">Changes Detected</div>
+      <button class="changelog-close" id="changelogClose">×</button>
+    </div>
+    <div id="changelogContent">
+      <!-- Content will be populated dynamically -->
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
@@ -1143,6 +1619,159 @@
     const cap = Number(person.Capacity || 0);
     const used = Number(person.currentReports || 0);
     return cap - used; // > 0 free, < 0 over, 0 at
+  }
+
+  // --- Change Log Functions ------------------------------------------------
+  function calculateChanges(oldPeople, newPeople) {
+    const changes = {
+      added: [],
+      removed: [],
+      managerChanged: [],
+      officeChanged: [],
+      regionChanged: []
+    };
+
+    const oldMap = new Map();
+    (oldPeople || []).forEach(p => {
+      const key = canonicalName(p.FullName || p.Name);
+      if (key) oldMap.set(key, p);
+    });
+
+    const newMap = new Map();
+    (newPeople || []).forEach(p => {
+      const key = canonicalName(p.FullName || p.Name);
+      if (key) newMap.set(key, p);
+    });
+
+    // Find added people
+    newMap.forEach((newP, key) => {
+      if (!oldMap.has(key)) {
+        changes.added.push(newP.FullName || newP.Name);
+      }
+    });
+
+    // Find removed people and changes
+    oldMap.forEach((oldP, key) => {
+      if (!newMap.has(key)) {
+        changes.removed.push(oldP.FullName || oldP.Name);
+      } else {
+        const newP = newMap.get(key);
+        const name = oldP.FullName || oldP.Name;
+
+        // Manager changed
+        const oldMgr = (oldP.Manager || '').trim();
+        const newMgr = (newP.Manager || '').trim();
+        if (oldMgr !== newMgr) {
+          changes.managerChanged.push({
+            name,
+            from: oldMgr || '(none)',
+            to: newMgr || '(none)'
+          });
+        }
+
+        // Office changed
+        const oldOffice = (oldP.Office || '').trim();
+        const newOffice = (newP.Office || '').trim();
+        if (oldOffice !== newOffice) {
+          changes.officeChanged.push({
+            name,
+            from: oldOffice || '(none)',
+            to: newOffice || '(none)'
+          });
+        }
+
+        // Region changed
+        const oldRegion = (oldP.Region || '').trim();
+        const newRegion = (newP.Region || '').trim();
+        if (oldRegion !== newRegion) {
+          changes.regionChanged.push({
+            name,
+            from: oldRegion || '(none)',
+            to: newRegion || '(none)'
+          });
+        }
+      }
+    });
+
+    return changes;
+  }
+
+  function hasChanges(changes) {
+    return changes.added.length > 0 ||
+           changes.removed.length > 0 ||
+           changes.managerChanged.length > 0 ||
+           changes.officeChanged.length > 0 ||
+           changes.regionChanged.length > 0;
+  }
+
+  function showChangeLogModal(changes) {
+    const modal = document.getElementById('changelogModal');
+    const content = document.getElementById('changelogContent');
+    if (!modal || !content) return;
+
+    let html = '';
+
+    if (changes.added.length > 0) {
+      html += `
+        <div class="changelog-section">
+          <div class="changelog-section-title added">+ People Added (${changes.added.length})</div>
+          <ul class="changelog-list">
+            ${changes.added.map(name => `<li>${name}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+
+    if (changes.removed.length > 0) {
+      html += `
+        <div class="changelog-section">
+          <div class="changelog-section-title removed">− People Removed (${changes.removed.length})</div>
+          <ul class="changelog-list">
+            ${changes.removed.map(name => `<li>${name}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+
+    if (changes.managerChanged.length > 0) {
+      html += `
+        <div class="changelog-section">
+          <div class="changelog-section-title changed">↔ Manager Changed (${changes.managerChanged.length})</div>
+          <ul class="changelog-list">
+            ${changes.managerChanged.map(c => `<li><strong>${c.name}</strong>: ${c.from} → ${c.to}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+
+    if (changes.officeChanged.length > 0) {
+      html += `
+        <div class="changelog-section">
+          <div class="changelog-section-title changed">🏢 Office Changed (${changes.officeChanged.length})</div>
+          <ul class="changelog-list">
+            ${changes.officeChanged.map(c => `<li><strong>${c.name}</strong>: ${c.from} → ${c.to}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+
+    if (changes.regionChanged.length > 0) {
+      html += `
+        <div class="changelog-section">
+          <div class="changelog-section-title changed">🌍 Region Changed (${changes.regionChanged.length})</div>
+          <ul class="changelog-list">
+            ${changes.regionChanged.map(c => `<li><strong>${c.name}</strong>: ${c.from} → ${c.to}</li>`).join('')}
+          </ul>
+        </div>
+      `;
+    }
+
+    if (!html) {
+      html = '<div class="changelog-empty">No changes detected from the previous data.</div>';
+    }
+
+    content.innerHTML = html;
+    modal.classList.add('active');
   }
 
   function getOfficesForRegion(regionOrRegions) {
@@ -1304,6 +1933,9 @@
 
   // --- Process into canonical people -------------------------------------
   function processObjects(objs){
+    // Save old people for change log comparison
+    const oldPeople = state.people ? [...state.people] : [];
+
     if (!objs || !objs.length){
       state.rawObjects = [];
       state.people = [];
@@ -1374,6 +2006,15 @@
     state.rawObjects = objs;
     state.people = people;
     state.managersByName = byName;
+
+    // Show change log if there was previous data
+    if (oldPeople.length > 0) {
+      const changes = calculateChanges(oldPeople, people);
+      if (hasChanges(changes)) {
+        showChangeLogModal(changes);
+      }
+    }
+
     renderAll();
   }
 
@@ -1523,9 +2164,32 @@
       return;
     }
 
+    // Build set of all person keys for orphan detection
+    const allKeys = new Set();
+    people.forEach(p => {
+      const key = canonicalName(p.FullName || p.Name);
+      if (key) allKeys.add(key);
+    });
+
     peopleBody.innerHTML = filtered.map(p=>{
+      const rowClasses = [];
+
+      // Check if over capacity
+      if (p.capStatus === 'over') {
+        rowClasses.push('row-over-capacity');
+      }
+
+      // Check if orphan (manager not in system)
+      const managerName = p.Manager;
+      if (managerName && managerName.trim()) {
+        const managerKey = canonicalName(managerName);
+        if (managerKey && !allKeys.has(managerKey)) {
+          rowClasses.push('row-orphan');
+        }
+      }
+
       return `
-        <tr>
+        <tr class="${rowClasses.join(' ')}">
           <td>${p.FullName || ''}</td>
           <td>${p.Grade || ''}</td>
           <td>${p.GradeLevel || ''}</td>
@@ -1760,6 +2424,21 @@
   const capacityResults = document.getElementById('capacity-results');
   const capacitySearchBtn = document.getElementById('capacity-search');
   const capacityClearBtn = document.getElementById('capacity-clear');
+  const capacityRecommendFor = document.getElementById('capacity-recommend-for');
+  const capacityPersonList = document.getElementById('capacity-person-list');
+
+  function populateCapacityPersonList(){
+    if (!capacityPersonList) return;
+    capacityPersonList.innerHTML = '';
+    (state.people || []).forEach(p => {
+      const name = p.FullName || p.Name || '';
+      if (name) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        capacityPersonList.appendChild(opt);
+      }
+    });
+  }
 
   function populateCapacityRegions(){
     if (!capacityRegionSelect) return;
@@ -1774,53 +2453,134 @@
     });
   }
 
+  // Calculate weighted recommendation score for a manager relative to a person
+  function calculateRecommendationScore(manager, targetPerson) {
+    let score = 0;
+    const reasons = [];
+
+    // Capacity score (0-40 points) - most important
+    const free = freeCapacity(manager);
+    if (free > 0) {
+      score += Math.min(40, free * 10);
+      reasons.push(`${free} capacity available`);
+    }
+
+    // Same office bonus (25 points)
+    if (targetPerson.Office && manager.Office === targetPerson.Office) {
+      score += 25;
+      reasons.push('Same office');
+    }
+
+    // Same region bonus (15 points) - only if not same office
+    else if (targetPerson.Region && manager.Region === targetPerson.Region) {
+      score += 15;
+      reasons.push('Same region');
+    }
+
+    // Grade appropriateness bonus (up to 20 points)
+    // Managers should ideally be 1-2 grades above the person
+    const gradeOrder = ['Trainee', 'Graduate', 'Consultant', 'Senior Consultant', 'Associate Director', 'Director', 'Senior Director'];
+    const targetGradeIdx = gradeOrder.findIndex(g => (targetPerson.Grade || '').includes(g));
+    const managerGradeIdx = gradeOrder.findIndex(g => (manager.Grade || '').includes(g));
+
+    if (targetGradeIdx >= 0 && managerGradeIdx >= 0) {
+      const diff = managerGradeIdx - targetGradeIdx;
+      if (diff >= 1 && diff <= 2) {
+        score += 20;
+        reasons.push('Appropriate grade level');
+      } else if (diff >= 3 && diff <= 4) {
+        score += 10;
+        reasons.push('Senior manager');
+      }
+    }
+
+    return { score, reasons };
+  }
+
   function updateCapacityResults(){
     if (!capacityResults) return;
 
     const regionFilter = capacityRegionSelect ? capacityRegionSelect.value : 'Any';
     const statusFilter = capacityStatusSelect ? capacityStatusSelect.value : 'any';
     const officeFilter = capacityOfficeSelect ? capacityOfficeSelect.value : 'Any';
+    const recommendForName = capacityRecommendFor ? capacityRecommendFor.value.trim() : '';
+
+    // Find target person if specified
+    let targetPerson = null;
+    if (recommendForName) {
+      const targetKey = canonicalName(recommendForName);
+      targetPerson = (state.people || []).find(p => canonicalName(p.FullName || p.Name) === targetKey);
+    }
 
     const managers = (state.people || []).filter(p => p.IsManager);
 
+    // Exclude the target person from being their own manager
     const filtered = managers.filter(p => {
+      if (targetPerson) {
+        const pKey = canonicalName(p.FullName || p.Name);
+        const targetKey = canonicalName(targetPerson.FullName || targetPerson.Name);
+        if (pKey === targetKey) return false;
+      }
       const regionOk = regionFilter === 'Any' || (p.Region || '') === regionFilter;
       const officeOk = officeFilter === 'Any' || (p.Office || '') === officeFilter;
       const statusOk = statusFilter === 'any' || (p.capStatus || '').toLowerCase() === statusFilter;
       return regionOk && officeOk && statusOk;
     });
 
-    filtered.sort((a, b) => {
-      const status = statusFilter;
-
-      if (status === 'over') {
-        const deltaA = capacityDelta(a);
-        const deltaB = capacityDelta(b);
-        if (deltaA !== deltaB) return deltaB - deltaA;
-      } else {
-        const freeA = freeCapacity(a);
-        const freeB = freeCapacity(b);
-        if (freeA !== freeB) return freeB - freeA;
+    // Calculate scores if we have a target person
+    let managersWithScores = filtered.map(p => {
+      if (targetPerson) {
+        const { score, reasons } = calculateRecommendationScore(p, targetPerson);
+        return { manager: p, score, reasons };
       }
-
-      const regionCompare = (a.Region || '').localeCompare(b.Region || '');
-      if (regionCompare !== 0) return regionCompare;
-
-      return (a.FullName || a.Name || '').localeCompare(b.FullName || b.Name || '');
+      return { manager: p, score: 0, reasons: [] };
     });
+
+    // Sort by score (descending) if we have a target, otherwise by capacity
+    if (targetPerson) {
+      managersWithScores.sort((a, b) => b.score - a.score);
+    } else {
+      managersWithScores.sort((a, b) => {
+        const status = statusFilter;
+        if (status === 'over') {
+          const deltaA = capacityDelta(a.manager);
+          const deltaB = capacityDelta(b.manager);
+          if (deltaA !== deltaB) return deltaB - deltaA;
+        } else {
+          const freeA = freeCapacity(a.manager);
+          const freeB = freeCapacity(b.manager);
+          if (freeA !== freeB) return freeB - freeA;
+        }
+        const regionCompare = (a.manager.Region || '').localeCompare(b.manager.Region || '');
+        if (regionCompare !== 0) return regionCompare;
+        return (a.manager.FullName || a.manager.Name || '').localeCompare(b.manager.FullName || b.manager.Name || '');
+      });
+    }
 
     capacityResults.innerHTML = '';
 
-    if (!filtered.length){
+    if (!managersWithScores.length){
       capacityResults.innerHTML = '<p class="muted">No managers match these filters.</p>';
       return;
     }
 
-    filtered.forEach(p => {
+    managersWithScores.forEach(({ manager: p, score, reasons }) => {
       const status = (p.capStatus || '').toLowerCase();
       const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
       const row = document.createElement('div');
       row.className = 'manager-row';
+
+      let scoreHtml = '';
+      if (targetPerson && score > 0) {
+        const scoreClass = score >= 60 ? 'high' : score >= 35 ? 'medium' : 'low';
+        scoreHtml = `
+          <div class="recommend-score">
+            <span class="recommend-badge ${scoreClass}">Score: ${score}</span>
+            <div class="recommend-reasons">${reasons.join(' • ')}</div>
+          </div>
+        `;
+      }
+
       row.innerHTML = `
         <div class="manager-main">
           <strong>${p.FullName || p.Name}</strong>
@@ -1828,6 +2588,7 @@
           <span>${p.Office || ''}</span>
           <span>${p.Region || ''}</span>
         </div>
+        ${scoreHtml}
         <div class="manager-cap">
           <span class="cap-chip ${status === 'over' ? 'cap-over' : status === 'full' ? 'cap-full' : 'cap-under'}">
             <span>${statusLabel}</span><strong>${p.currentReports || 0}/${p.Capacity || 0}</strong>
@@ -1843,6 +2604,7 @@
   }
   if (capacityClearBtn){
     capacityClearBtn.addEventListener('click', ()=>{
+      if (capacityRecommendFor) capacityRecommendFor.value = '';
       if (capacityRegionSelect) capacityRegionSelect.value = 'Any';
       populateOfficeSelect(capacityOfficeSelect, 'Any');
       if (capacityOfficeSelect) capacityOfficeSelect.value = 'Any';
@@ -1869,6 +2631,15 @@
   const orgPersonSearch = document.getElementById('orgPersonSearch');
   const orgPersonList = document.getElementById('orgPersonList');
   const orgClearBtn = document.getElementById('orgClearBtn');
+  const zoomInBtn = document.getElementById('zoomIn');
+  const zoomOutBtn = document.getElementById('zoomOut');
+  const zoomResetBtn = document.getElementById('zoomReset');
+  const zoomLevelDisplay = document.getElementById('zoomLevel');
+  const colorByCapacityCheckbox = document.getElementById('colorByCapacity');
+  let orgZoomLevel = 1;
+  const ZOOM_MIN = 0.5;
+  const ZOOM_MAX = 2;
+  const ZOOM_STEP = 0.1;
   let currentOrgView = 'overall'; // Track current view for external info
 
   // --- Helpers for the hierarchy view ---------------------------------------
@@ -1889,6 +2660,23 @@
         count++; // Direct report
         const childKey = canonicalName(p.FullName || p.Name);
         count += getTotalTeamSize(childKey, allPeople, visited); // Indirect reports
+      }
+    });
+    return count;
+  }
+
+  // Calculate team size in a specific group (region/office)
+  function getTeamSizeInGroup(personKey, groupPeople, visited = new Set()) {
+    if (!personKey || visited.has(personKey)) return 0;
+    visited.add(personKey);
+
+    let count = 0;
+    groupPeople.forEach(p => {
+      const mgrKey = canonicalName(p.Manager);
+      if (mgrKey === personKey) {
+        count++; // Direct report in this group
+        const childKey = canonicalName(p.FullName || p.Name);
+        count += getTeamSizeInGroup(childKey, groupPeople, visited); // Indirect reports
       }
     });
     return count;
@@ -2040,7 +2828,7 @@
     showExternalRelationshipsInfo(person, groupKey);
   }
 
-  function createOrgTreeCard(node, groupKey) {
+  function createOrgTreeCard(node, groupKey, groupPeople, groupLabel) {
     const person = node.person || node.raw || {};
     const card = document.createElement('div');
     card.className = 'org-card org-person-card';
@@ -2069,13 +2857,18 @@
       card.classList.add('org-over-capacity');
     }
 
-    // Calculate total team size (direct + indirect reports)
-    const allPeople = state.people || [];
-    const totalTeam = getTotalTeamSize(personKey, allPeople);
+    // Add capacity status class for color mode
+    card.classList.add(`cap-status-${status || 'under'}`);
+
+    // Calculate team size in current group
+    const peopleInGroup = groupPeople || state.people || [];
+    const teamInGroup = getTeamSizeInGroup(personKey, peopleInGroup);
+    const displayLabel = groupLabel && groupLabel !== 'Overall' ? groupLabel : '';
 
     let teamBadgeHtml = '';
-    if (totalTeam > 0) {
-      teamBadgeHtml = `<div class="org-team-badge">Total team: <span class="team-count">${totalTeam}</span></div>`;
+    if (teamInGroup > 0) {
+      const labelText = displayLabel ? `Team in ${displayLabel}:` : 'Team:';
+      teamBadgeHtml = `<div class="org-team-badge">${labelText} <span class="team-count">${teamInGroup}</span></div>`;
     }
 
     card.innerHTML = `
@@ -2286,7 +3079,7 @@
       const row = document.createElement('div');
       row.className = 'org-level-row';
       levelNodes.forEach(node => {
-        row.appendChild(createOrgTreeCard(node, groupKey));
+        row.appendChild(createOrgTreeCard(node, groupKey, group.people, group.label));
       });
       section.appendChild(row);
       groupContainer.appendChild(section);
@@ -2300,8 +3093,6 @@
     requestAnimationFrame(() => {
       drawConnectionLines(treeContainer, svg, nodes, nodeByName);
     });
-
-    console.log('Organigram tree', group.label, 'nodes:', nodes.length, 'expected:', group.people.length);
   }
 
   function drawConnectionLines(container, svg, nodes, nodeByName) {
@@ -2446,7 +3237,7 @@
       const row = document.createElement('div');
       row.className = 'org-level-row';
       levelNodes.forEach(node => {
-        row.appendChild(createOrgTreeCard(node, groupKey));
+        row.appendChild(createOrgTreeCard(node, groupKey, groupPeople, groupLabel));
       });
       section.appendChild(row);
       groupContainer.appendChild(section);
@@ -2482,7 +3273,8 @@
         // Find manager in all people
         const manager = allPeople.find(p => canonicalName(p.FullName || p.Name) === managerKey);
         if (manager) {
-          const location = manager.Region || manager.Office || 'another location';
+          const locationParts = [manager.Office, manager.Region].filter(Boolean);
+          const location = locationParts.length > 0 ? locationParts.join(', ') : 'another location';
           messages.push({
             type: 'manager',
             text: `Manager: ${manager.FullName || manager.Name} (${location})`
@@ -2504,10 +3296,10 @@
     if (externalReports.length > 0) {
       const locations = new Set();
       externalReports.forEach(r => {
-        if (r.Region) locations.add(r.Region);
-        else if (r.Office) locations.add(r.Office);
+        const loc = [r.Office, r.Region].filter(Boolean).join(', ');
+        if (loc) locations.add(loc);
       });
-      const locStr = locations.size > 0 ? Array.from(locations).join(', ') : 'other locations';
+      const locStr = locations.size > 0 ? Array.from(locations).join('; ') : 'other locations';
       messages.push({
         type: 'reports',
         text: `${externalReports.length} report${externalReports.length > 1 ? 's' : ''} in ${locStr}`
@@ -2710,6 +3502,10 @@
   function onOrgGroupByChange() {
     const mode = orgGroupBy.value;
     currentOrgView = mode;
+
+    // Reset zoom when view changes
+    orgZoomLevel = 1;
+    applyOrgZoom();
 
     // Hide all optional fields first
     if (orgSubGroupField) orgSubGroupField.style.display = 'none';
@@ -2999,6 +3795,9 @@
       card.classList.add('org-over-capacity');
     }
 
+    // Add capacity status class for color mode
+    card.classList.add(`cap-status-${status || 'under'}`);
+
     // Calculate total team size
     const allPeople = state.people || [];
     const totalTeam = getTotalTeamSize(personKey, allPeople);
@@ -3104,6 +3903,227 @@
     });
   }
 
+  // Zoom controls
+  function applyOrgZoom() {
+    const treeWrap = document.querySelector('.org-tree-wrap');
+    if (!treeWrap) return;
+
+    // Apply transform to the orgTreeRoot
+    if (orgTreeRoot) {
+      orgTreeRoot.style.transform = `scale(${orgZoomLevel})`;
+      orgTreeRoot.style.transformOrigin = 'top left';
+    }
+
+    // Update display
+    if (zoomLevelDisplay) {
+      zoomLevelDisplay.textContent = Math.round(orgZoomLevel * 100) + '%';
+    }
+
+    // Update button states
+    if (zoomInBtn) zoomInBtn.disabled = orgZoomLevel >= ZOOM_MAX;
+    if (zoomOutBtn) zoomOutBtn.disabled = orgZoomLevel <= ZOOM_MIN;
+  }
+
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener('click', () => {
+      if (orgZoomLevel < ZOOM_MAX) {
+        orgZoomLevel = Math.min(ZOOM_MAX, orgZoomLevel + ZOOM_STEP);
+        applyOrgZoom();
+      }
+    });
+  }
+
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener('click', () => {
+      if (orgZoomLevel > ZOOM_MIN) {
+        orgZoomLevel = Math.max(ZOOM_MIN, orgZoomLevel - ZOOM_STEP);
+        applyOrgZoom();
+      }
+    });
+  }
+
+  if (zoomResetBtn) {
+    zoomResetBtn.addEventListener('click', () => {
+      orgZoomLevel = 1;
+      applyOrgZoom();
+    });
+  }
+
+  // Color by capacity toggle
+  if (colorByCapacityCheckbox) {
+    colorByCapacityCheckbox.addEventListener('change', () => {
+      if (orgTreeRoot) {
+        orgTreeRoot.classList.toggle('color-by-capacity', colorByCapacityCheckbox.checked);
+      }
+    });
+  }
+
+  // Export organigram functionality
+  const exportOrgPng = document.getElementById('exportOrgPng');
+  const exportOrgPdf = document.getElementById('exportOrgPdf');
+
+  function getExportTitle() {
+    const mode = orgGroupBy ? orgGroupBy.value : 'overall';
+    if (mode === 'overall') return 'Organigram_Overall';
+    if (mode === 'region') {
+      const region = orgSubGroupSelect ? orgSubGroupSelect.value : '';
+      return `Organigram_${region || 'Region'}`;
+    }
+    if (mode === 'office') {
+      const office = orgSubGroupSelect ? orgSubGroupSelect.value : '';
+      return `Organigram_${office || 'Office'}`;
+    }
+    if (mode === 'person') {
+      const person = orgPersonSearch ? orgPersonSearch.value : '';
+      return `Organigram_${person || 'Person'}`;
+    }
+    return 'Organigram';
+  }
+
+  async function exportOrganigramPng() {
+    if (!orgTreeRoot) return;
+
+    const treeWrap = document.querySelector('.org-tree-wrap');
+    if (!treeWrap) return;
+
+    // Reset zoom for export
+    const oldTransform = orgTreeRoot.style.transform;
+    orgTreeRoot.style.transform = 'none';
+
+    try {
+      const canvas = await html2canvas(treeWrap, {
+        backgroundColor: '#171821',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        scrollX: 0,
+        scrollY: 0
+      });
+
+      const link = document.createElement('a');
+      link.download = `${getExportTitle()}_${new Date().toISOString().split('T')[0]}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error('Export PNG error:', err);
+      alert('Could not export as PNG. Please try again.');
+    } finally {
+      orgTreeRoot.style.transform = oldTransform;
+    }
+  }
+
+  async function exportOrganigramPdf() {
+    if (!orgTreeRoot) return;
+
+    const treeWrap = document.querySelector('.org-tree-wrap');
+    if (!treeWrap) return;
+
+    // Reset zoom for export
+    const oldTransform = orgTreeRoot.style.transform;
+    orgTreeRoot.style.transform = 'none';
+
+    try {
+      const canvas = await html2canvas(treeWrap, {
+        backgroundColor: '#171821',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        scrollX: 0,
+        scrollY: 0
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+
+      // Determine orientation based on content dimensions
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const orientation = imgWidth > imgHeight ? 'landscape' : 'portrait';
+
+      const pdf = new jsPDF({
+        orientation: orientation,
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+
+      // Calculate scaling to fit page
+      const maxWidth = pageWidth - (margin * 2);
+      const maxHeight = pageHeight - (margin * 2);
+      const ratio = Math.min(maxWidth / (imgWidth / 2), maxHeight / (imgHeight / 2));
+      const scaledWidth = (imgWidth / 2) * ratio;
+      const scaledHeight = (imgHeight / 2) * ratio;
+
+      // Center on page
+      const x = (pageWidth - scaledWidth) / 2;
+      const y = margin;
+
+      // Add title
+      pdf.setFontSize(14);
+      pdf.setTextColor(255, 212, 0);
+      pdf.text(getExportTitle().replace(/_/g, ' '), pageWidth / 2, margin / 2 + 3, { align: 'center' });
+
+      pdf.addImage(imgData, 'PNG', x, y + 5, scaledWidth, scaledHeight);
+
+      pdf.save(`${getExportTitle()}_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error('Export PDF error:', err);
+      alert('Could not export as PDF. Please try again.');
+    } finally {
+      orgTreeRoot.style.transform = oldTransform;
+    }
+  }
+
+  if (exportOrgPng) {
+    exportOrgPng.addEventListener('click', exportOrganigramPng);
+  }
+
+  if (exportOrgPdf) {
+    exportOrgPdf.addEventListener('click', exportOrganigramPdf);
+  }
+
+  // Info modal
+  const infoBtn = document.getElementById('infoBtn');
+  const infoModal = document.getElementById('infoModal');
+  const infoModalClose = document.getElementById('infoModalClose');
+
+  if (infoBtn && infoModal) {
+    infoBtn.addEventListener('click', () => {
+      infoModal.classList.add('active');
+    });
+
+    infoModalClose.addEventListener('click', () => {
+      infoModal.classList.remove('active');
+    });
+
+    infoModal.addEventListener('click', (e) => {
+      if (e.target === infoModal) {
+        infoModal.classList.remove('active');
+      }
+    });
+  }
+
+  // Change log modal
+  const changelogModal = document.getElementById('changelogModal');
+  const changelogClose = document.getElementById('changelogClose');
+
+  if (changelogModal) {
+    if (changelogClose) {
+      changelogClose.addEventListener('click', () => {
+        changelogModal.classList.remove('active');
+      });
+    }
+
+    changelogModal.addEventListener('click', (e) => {
+      if (e.target === changelogModal) {
+        changelogModal.classList.remove('active');
+      }
+    });
+  }
+
   // --- Tabs --------------------------------------------------------------
   document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -3178,6 +4198,7 @@
     renderPeopleTable();
     fillFilterOptions();
     populateCapacityRegions();
+    populateCapacityPersonList();
     populateOfficeSelect(capacityOfficeSelect, (capacityRegionSelect && capacityRegionSelect.value) || 'Any');
     // Don't auto-populate results - require user to click Search
     const hasData = (state.people || []).length>0;
