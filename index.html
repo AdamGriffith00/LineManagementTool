@@ -705,6 +705,76 @@
     .org-legend-color.selected { background: var(--accent-yellow); }
     .org-legend-color.manager { background: #4ecdc4; }
     .org-legend-color.report { background: rgba(255, 212, 0, 0.7); }
+
+    /* Out-of-group relationship info */
+    .org-external-info {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-card);
+      border: 1px solid var(--border-soft);
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      max-width: 400px;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    .org-external-info-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text-main);
+    }
+
+    .org-external-info-item {
+      font-size: 12px;
+      color: var(--text-soft);
+      padding: 4px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .org-external-info-item .badge {
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+
+    .org-external-info-item .badge.manager {
+      background: rgba(78, 205, 196, 0.2);
+      color: #4ecdc4;
+      border: 1px solid rgba(78, 205, 196, 0.4);
+    }
+
+    .org-external-info-item .badge.reports {
+      background: rgba(255, 212, 0, 0.15);
+      color: var(--accent-yellow);
+      border: 1px solid rgba(255, 212, 0, 0.4);
+    }
+
+    .org-external-close {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: none;
+      border: none;
+      color: var(--text-soft);
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .org-external-close:hover {
+      color: var(--text-main);
+    }
   </style>
 </head>
 <body>
@@ -848,21 +918,24 @@
     <div class="card">
       <div class="pill-label">Organigram</div>
       <div class="org-controls">
-        <div class="field" style="flex:1;min-width:160px;margin-bottom:0;">
-          <div class="field-label">Group by</div>
+        <div class="field" style="min-width:140px;margin-bottom:0;">
+          <div class="field-label">View</div>
           <select id="orgGroupBy">
-            <option value="overall">Overall</option>
-            <option value="region" selected>Region</option>
-            <option value="office">Office</option>
+            <option value="overall" selected>Overall</option>
+            <option value="region">By Region</option>
+            <option value="office">By Office</option>
           </select>
         </div>
-        <div class="org-group-actions">
-          <button class="btn" id="orgBuildBtn" disabled>Build organigram</button>
+        <div class="field" id="orgSubGroupField" style="min-width:160px;margin-bottom:0;display:none;">
+          <div class="field-label">Select <span id="orgSubGroupLabel">Region</span></div>
+          <select id="orgSubGroupSelect">
+            <option value="">-- Select --</option>
+          </select>
         </div>
       </div>
       <div class="org-tree-wrap">
         <div id="orgTreeRoot" class="org-tree">
-          <div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>
+          <div class="subtle">Upload a file on the Overview tab to see the organigram.</div>
         </div>
       </div>
     </div>
@@ -1623,8 +1696,11 @@
 
   // --- Organigram --------------------------------------------------------
   const orgGroupBy = document.getElementById('orgGroupBy');
-  const orgBuildBtn = document.getElementById('orgBuildBtn');
+  const orgSubGroupField = document.getElementById('orgSubGroupField');
+  const orgSubGroupSelect = document.getElementById('orgSubGroupSelect');
+  const orgSubGroupLabel = document.getElementById('orgSubGroupLabel');
   const orgTreeRoot = document.getElementById('orgTreeRoot');
+  let currentOrgView = 'overall'; // Track current view for external info
 
   // --- Helpers for the hierarchy view ---------------------------------------
 
@@ -1772,6 +1848,10 @@
         }
       }
     });
+
+    // Show info about relationships outside this group
+    const person = node.person || {};
+    showExternalRelationshipsInfo(person, groupKey);
   }
 
   function createOrgTreeCard(node, groupKey) {
@@ -2069,6 +2149,194 @@
     });
   }
 
+  // Render tree directly to orgTreeRoot (for auto-build)
+  function renderOrgTreeDirect(groupKey, groupLabel, groupPeople) {
+    orgTreeRoot.innerHTML = '';
+
+    if (!groupPeople || !groupPeople.length) {
+      orgTreeRoot.innerHTML = '<div class="subtle">No people in this group.</div>';
+      return;
+    }
+
+    const { nodes, roots } = buildHierarchyForGroup(groupPeople);
+
+    const nodeByName = new Map();
+    nodes.forEach(node => {
+      const person = node.person || {};
+      const rawName = person.FullName || person.Name || '';
+      const key = canonicalName(rawName);
+      if (key) {
+        nodeByName.set(key, node);
+        node.personKey = key;
+      }
+    });
+
+    if (!state.orgTreesByGroup) state.orgTreesByGroup = {};
+    state.orgTreesByGroup[groupKey] = { nodes, roots, nodeByName, groupLabel };
+
+    const levels = new Map();
+    let maxDepth = 0;
+    nodes.forEach(n => {
+      const d = n.depth || 0;
+      if (!levels.has(d)) levels.set(d, []);
+      levels.get(d).push(n);
+      if (d > maxDepth) maxDepth = d;
+    });
+
+    levels.forEach(levelNodes => {
+      levelNodes.sort((a, b) => {
+        const ga = gradeIndex(a.person.Grade);
+        const gb = gradeIndex(b.person.Grade);
+        if (ga !== gb) return ga - gb;
+        return (a.person.FullName || '').localeCompare(b.person.FullName || '');
+      });
+    });
+
+    // Add legend
+    const legend = document.createElement('div');
+    legend.className = 'org-legend';
+    legend.innerHTML = `
+      <span class="subtle">Click a person to see relationships:</span>
+      <div class="org-legend-item"><div class="org-legend-color selected"></div> Selected</div>
+      <div class="org-legend-item"><div class="org-legend-color manager"></div> Their Manager</div>
+      <div class="org-legend-item"><div class="org-legend-color report"></div> Their Reports</div>
+    `;
+    orgTreeRoot.appendChild(legend);
+
+    // Create tree container
+    const treeContainer = document.createElement('div');
+    treeContainer.className = 'org-tree-container';
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'org-tree-svg');
+    treeContainer.appendChild(svg);
+
+    const treeContent = document.createElement('div');
+    treeContent.className = 'org-tree-content';
+
+    const groupContainer = document.createElement('div');
+    groupContainer.className = 'org-group org-tree';
+    groupContainer.setAttribute('data-group-key', groupKey);
+
+    const gradeLevelLabels = {
+      0: 'Senior Director',
+      1: 'Director',
+      2: 'Project Director',
+      3: 'Associate Director',
+      4: 'Executive Cost Manager',
+      5: 'Senior Cost Manager',
+      6: 'Cost Manager',
+      7: 'Assistant Cost Manager',
+      8: 'Graduate Cost Manager',
+      9: 'Trainee Cost Manager'
+    };
+
+    for (let depth = 0; depth <= maxDepth; depth++) {
+      const levelNodes = levels.get(depth) || [];
+      if (!levelNodes.length) continue;
+
+      const section = document.createElement('div');
+      section.className = 'org-level-section';
+
+      const label = document.createElement('div');
+      label.className = 'org-level-label';
+      label.textContent = gradeLevelLabels[depth] || `Level ${depth}`;
+      section.appendChild(label);
+
+      const row = document.createElement('div');
+      row.className = 'org-level-row';
+      levelNodes.forEach(node => {
+        row.appendChild(createOrgTreeCard(node, groupKey));
+      });
+      section.appendChild(row);
+      groupContainer.appendChild(section);
+    }
+
+    treeContent.appendChild(groupContainer);
+    treeContainer.appendChild(treeContent);
+    orgTreeRoot.appendChild(treeContainer);
+
+    // Draw connection lines
+    requestAnimationFrame(() => {
+      drawConnectionLines(treeContainer, svg, nodes, nodeByName);
+    });
+  }
+
+  // Show info about out-of-group relationships
+  function showExternalRelationshipsInfo(person, groupKey) {
+    // Remove any existing info box
+    const existing = document.querySelector('.org-external-info');
+    if (existing) existing.remove();
+
+    const allPeople = state.people || [];
+    const treeInfo = state.orgTreesByGroup && state.orgTreesByGroup[groupKey];
+    if (!treeInfo) return;
+
+    const messages = [];
+
+    // Check if manager is outside this group
+    const managerKey = canonicalName(person.Manager);
+    if (managerKey) {
+      const managerInGroup = treeInfo.nodeByName.get(managerKey);
+      if (!managerInGroup) {
+        // Find manager in all people
+        const manager = allPeople.find(p => canonicalName(p.FullName || p.Name) === managerKey);
+        if (manager) {
+          const location = manager.Region || manager.Office || 'another location';
+          messages.push({
+            type: 'manager',
+            text: `Manager: ${manager.FullName || manager.Name} (${location})`
+          });
+        }
+      }
+    }
+
+    // Check for reports outside this group
+    const personKey = canonicalName(person.FullName || person.Name);
+    const externalReports = allPeople.filter(p => {
+      const theirManagerKey = canonicalName(p.Manager);
+      if (theirManagerKey !== personKey) return false;
+      // Check if they're in the current group
+      const inGroup = treeInfo.nodeByName.get(canonicalName(p.FullName || p.Name));
+      return !inGroup;
+    });
+
+    if (externalReports.length > 0) {
+      const locations = new Set();
+      externalReports.forEach(r => {
+        if (r.Region) locations.add(r.Region);
+        else if (r.Office) locations.add(r.Office);
+      });
+      const locStr = locations.size > 0 ? Array.from(locations).join(', ') : 'other locations';
+      messages.push({
+        type: 'reports',
+        text: `${externalReports.length} report${externalReports.length > 1 ? 's' : ''} in ${locStr}`
+      });
+    }
+
+    if (messages.length === 0) return;
+
+    // Create info box
+    const infoBox = document.createElement('div');
+    infoBox.className = 'org-external-info';
+    infoBox.innerHTML = `
+      <button class="org-external-close" onclick="this.parentElement.remove()">×</button>
+      <div class="org-external-info-title">${person.FullName || person.Name}</div>
+      ${messages.map(m => `
+        <div class="org-external-info-item">
+          <span class="badge ${m.type}">${m.type === 'manager' ? '↑ Manager' : '↓ Reports'}</span>
+          ${m.text}
+        </div>
+      `).join('')}
+    `;
+    document.body.appendChild(infoBox);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (infoBox.parentElement) infoBox.remove();
+    }, 5000);
+  }
+
   function renderOrganigram(){
     const people = state.people || [];
     if (!people.length){
@@ -2238,7 +2506,83 @@
     }
   }
 
-  orgBuildBtn.addEventListener('click', renderOrganigram);
+  // Organigram view change handler
+  function onOrgGroupByChange() {
+    const mode = orgGroupBy.value;
+    currentOrgView = mode;
+
+    if (mode === 'overall') {
+      // Hide sub-group selector and build overall view
+      if (orgSubGroupField) orgSubGroupField.style.display = 'none';
+      buildOrganigramForGroup('overall');
+    } else {
+      // Show sub-group selector and populate it
+      if (orgSubGroupField) orgSubGroupField.style.display = 'block';
+      if (orgSubGroupLabel) orgSubGroupLabel.textContent = mode === 'region' ? 'Region' : 'Office';
+      populateSubGroupSelect(mode);
+    }
+  }
+
+  function populateSubGroupSelect(mode) {
+    if (!orgSubGroupSelect) return;
+    const people = state.people || [];
+    const values = new Set();
+
+    people.forEach(p => {
+      const val = mode === 'region' ? p.Region : p.Office;
+      if (val) values.add(val);
+    });
+
+    const sorted = Array.from(values).sort();
+    orgSubGroupSelect.innerHTML = '<option value="">-- Select --</option>';
+    sorted.forEach(val => {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = val;
+      orgSubGroupSelect.appendChild(opt);
+    });
+  }
+
+  function onSubGroupSelectChange() {
+    const val = orgSubGroupSelect.value;
+    if (val) {
+      buildOrganigramForGroup(val);
+    }
+  }
+
+  function buildOrganigramForGroup(groupKey) {
+    const people = state.people || [];
+    if (!people.length) {
+      orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab to see the organigram.</div>';
+      return;
+    }
+
+    const mode = orgGroupBy.value;
+    let groupPeople;
+    let groupLabel;
+
+    if (groupKey === 'overall') {
+      groupPeople = people;
+      groupLabel = 'Overall';
+    } else if (mode === 'region') {
+      groupPeople = people.filter(p => p.Region === groupKey);
+      groupLabel = groupKey;
+    } else {
+      groupPeople = people.filter(p => p.Office === groupKey);
+      groupLabel = groupKey;
+    }
+
+    // Render directly to orgTreeRoot (no group list needed)
+    renderOrgTreeDirect(groupKey, groupLabel, groupPeople);
+  }
+
+  if (orgGroupBy) {
+    orgGroupBy.addEventListener('change', onOrgGroupByChange);
+  }
+
+  if (orgSubGroupSelect) {
+    orgSubGroupSelect.addEventListener('change', onSubGroupSelectChange);
+  }
 
   // --- Tabs --------------------------------------------------------------
   document.querySelectorAll('.tab-btn').forEach(btn=>{
@@ -2246,6 +2590,11 @@
       const tab = btn.dataset.tab;
       document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b===btn));
       document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id === 'tab-'+tab));
+
+      // Auto-build organigram when switching to that tab
+      if (tab === 'organigram' && (state.people || []).length > 0) {
+        onOrgGroupByChange();
+      }
     });
   });
 
@@ -2312,10 +2661,9 @@
     populateOfficeSelect(capacityOfficeSelect, (capacityRegionSelect && capacityRegionSelect.value) || 'Any');
     updateCapacityResults();
     const hasData = (state.people || []).length>0;
-    orgBuildBtn.disabled = !hasData;
     if (!hasData){
       fmResults.innerHTML = '<div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>';
-      orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab and click <strong>Build organigram</strong> to see the structure.</div>';
+      orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab to see the organigram.</div>';
     }
   }
 
