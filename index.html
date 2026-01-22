@@ -672,6 +672,24 @@
       color: #ff6b6b;
     }
 
+    /* Team size badge */
+    .org-team-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: var(--text-soft);
+      margin-top: 4px;
+    }
+
+    .org-team-badge .team-count {
+      background: rgba(255, 212, 0, 0.15);
+      color: var(--accent-yellow);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
     /* Direct report of selected person - yellow (lighter) */
     .org-person-card.org-highlight-report {
       box-shadow: 0 0 0 3px rgba(255, 212, 0, 0.7);
@@ -1729,6 +1747,23 @@
     return (name || '').toString().trim().replace(/\s+/g, ' ').toLowerCase();
   }
 
+  // Calculate total team size (direct + indirect reports)
+  function getTotalTeamSize(personKey, allPeople, visited = new Set()) {
+    if (!personKey || visited.has(personKey)) return 0;
+    visited.add(personKey);
+
+    let count = 0;
+    allPeople.forEach(p => {
+      const mgrKey = canonicalName(p.Manager);
+      if (mgrKey === personKey) {
+        count++; // Direct report
+        const childKey = canonicalName(p.FullName || p.Name);
+        count += getTotalTeamSize(childKey, allPeople, visited); // Indirect reports
+      }
+    });
+    return count;
+  }
+
   function gradeIndex(grade) {
     const idx = GRADE_ORDER.indexOf((grade || '').trim());
     return idx === -1 ? GRADE_ORDER.length : idx;
@@ -1904,12 +1939,22 @@
       card.classList.add('org-over-capacity');
     }
 
+    // Calculate total team size (direct + indirect reports)
+    const allPeople = state.people || [];
+    const totalTeam = getTotalTeamSize(personKey, allPeople);
+
+    let teamBadgeHtml = '';
+    if (totalTeam > 0) {
+      teamBadgeHtml = `<div class="org-team-badge">Total team: <span class="team-count">${totalTeam}</span></div>`;
+    }
+
     card.innerHTML = `
       <div class="org-name">${person.FullName || person.Name || ''}</div>
       <div class="org-meta">${[person.Grade || '', person.Office || ''].filter(Boolean).join(' • ')}</div>
       <div class="org-cap">
         <span class="${capCls}"><span>${statusLabel}</span><strong>${person.currentReports || 0}/${person.Capacity || 0}</strong></span>
       </div>
+      ${teamBadgeHtml}
     `;
 
     return card;
@@ -2824,12 +2869,22 @@
       card.classList.add('org-over-capacity');
     }
 
+    // Calculate total team size
+    const allPeople = state.people || [];
+    const totalTeam = getTotalTeamSize(personKey, allPeople);
+
+    let teamBadgeHtml = '';
+    if (totalTeam > 0) {
+      teamBadgeHtml = `<div class="org-team-badge">Total team: <span class="team-count">${totalTeam}</span></div>`;
+    }
+
     card.innerHTML = `
       <div class="org-name">${person.FullName || person.Name || ''}</div>
       <div class="org-meta">${[person.Grade || '', person.Office || '', person.Region || ''].filter(Boolean).join(' • ')}</div>
       <div class="org-cap">
         <span class="${capCls}"><span>${statusLabel}</span><strong>${person.currentReports || 0}/${person.Capacity || 0}</strong></span>
       </div>
+      ${teamBadgeHtml}
     `;
 
     card.addEventListener('click', onOrgPersonCardClick);
