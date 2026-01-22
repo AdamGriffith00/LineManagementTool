@@ -662,6 +662,16 @@
       z-index: 5;
     }
 
+    /* Over-capacity manager - red warning */
+    .org-person-card.org-over-capacity {
+      border: 2px solid #ff6b6b;
+      box-shadow: 0 0 12px rgba(255, 107, 107, 0.4);
+    }
+
+    .org-person-card.org-over-capacity .org-name {
+      color: #ff6b6b;
+    }
+
     /* Direct report of selected person - yellow (lighter) */
     .org-person-card.org-highlight-report {
       box-shadow: 0 0 0 3px rgba(255, 212, 0, 0.7);
@@ -1881,7 +1891,6 @@
       person.name ||
       '';
     const personKey = node.personKey || canonicalName(rawName);
-    console.log('Org card personKey', rawName, '=>', personKey);
     card.dataset.personKey = personKey || '';
     card.dataset.groupKey = groupKey || '';
     card.addEventListener('click', onOrgPersonCardClick);
@@ -1889,6 +1898,11 @@
     const status = (person.capStatus || '').toLowerCase();
     const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
     const capCls = status === 'over' ? 'cap-chip cap-over' : status === 'full' ? 'cap-chip cap-full' : 'cap-chip cap-under';
+
+    // Highlight over-capacity managers
+    if (status === 'over') {
+      card.classList.add('org-over-capacity');
+    }
 
     card.innerHTML = `
       <div class="org-name">${person.FullName || person.Name || ''}</div>
@@ -2804,6 +2818,11 @@
     const status = (person.capStatus || '').toLowerCase();
     const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
     const capCls = status === 'over' ? 'cap-chip cap-over' : status === 'full' ? 'cap-chip cap-full' : 'cap-chip cap-under';
+
+    // Highlight over-capacity managers
+    if (status === 'over') {
+      card.classList.add('org-over-capacity');
+    }
 
     card.innerHTML = `
       <div class="org-name">${person.FullName || person.Name || ''}</div>
