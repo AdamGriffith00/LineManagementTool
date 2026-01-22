@@ -201,6 +201,53 @@
     .summary-badge span { opacity: 0.8; }
     .summary-badge strong { color: #fff; }
 
+    .summary-warnings {
+      margin-top: 12px;
+    }
+
+    .summary-warning {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .summary-warning.warning-error {
+      background: rgba(255, 107, 107, 0.1);
+      border: 1px solid rgba(255, 107, 107, 0.3);
+      color: #ff6b6b;
+    }
+
+    .summary-warning.warning-info {
+      background: rgba(78, 205, 196, 0.1);
+      border: 1px solid rgba(78, 205, 196, 0.3);
+      color: #4ecdc4;
+    }
+
+    .summary-warning-icon {
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .summary-warning-content {
+      flex: 1;
+    }
+
+    .summary-warning-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .summary-warning-list {
+      font-size: 11px;
+      opacity: 0.9;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+
     .shell-overview {
       display: grid;
       grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -841,6 +888,7 @@
             <div class="summary-badge"><span>At capacity</span> <strong>0</strong></div>
             <div class="summary-badge"><span>Over capacity</span> <strong>0</strong></div>
           </div>
+          <div class="summary-warnings" id="summaryWarnings"></div>
         </div>
 
         <div class="card">
@@ -1333,6 +1381,7 @@
   function renderSummary(){
     const line = document.getElementById('summaryLine');
     const badges = document.getElementById('summaryBadges');
+    const warnings = document.getElementById('summaryWarnings');
     const people = state.people || [];
     const total = people.length;
     const managerList = people.filter(p=>p.IsManager || p.currentReports>0);
@@ -1351,6 +1400,87 @@
       <div class="summary-badge"><span>At capacity</span> <strong>${full}</strong></div>
       <div class="summary-badge"><span>Over capacity</span> <strong>${over}</strong></div>
     `;
+
+    // Detect data issues
+    if (warnings && total > 0) {
+      const issues = detectDataIssues(people);
+      warnings.innerHTML = issues.map(issue => `
+        <div class="summary-warning warning-${issue.type}">
+          <span class="summary-warning-icon">${issue.type === 'error' ? '⚠️' : 'ℹ️'}</span>
+          <div class="summary-warning-content">
+            <div class="summary-warning-title">${issue.title} (${issue.items.length})</div>
+            <div class="summary-warning-list">${issue.items.slice(0, 10).join(', ')}${issue.items.length > 10 ? `, +${issue.items.length - 10} more` : ''}</div>
+          </div>
+        </div>
+      `).join('');
+    } else if (warnings) {
+      warnings.innerHTML = '';
+    }
+  }
+
+  function detectDataIssues(people) {
+    const issues = [];
+
+    // Build set of all person keys
+    const allKeys = new Set();
+    people.forEach(p => {
+      const key = canonicalName(p.FullName || p.Name);
+      if (key) allKeys.add(key);
+    });
+
+    // Detect orphans (manager not in system)
+    const orphans = [];
+    people.forEach(p => {
+      const managerName = p.Manager;
+      if (managerName && managerName.trim()) {
+        const managerKey = canonicalName(managerName);
+        if (managerKey && !allKeys.has(managerKey)) {
+          orphans.push(`${p.FullName || p.Name} → ${managerName}`);
+        }
+      }
+    });
+
+    if (orphans.length > 0) {
+      issues.push({
+        type: 'error',
+        title: 'Orphans (manager not in system)',
+        items: orphans
+      });
+    }
+
+    // Detect circular references
+    const circular = [];
+    people.forEach(p => {
+      const personKey = canonicalName(p.FullName || p.Name);
+      const visited = new Set();
+      let current = p;
+      let depth = 0;
+
+      while (current && depth < 50) {
+        const currentKey = canonicalName(current.FullName || current.Name);
+        if (visited.has(currentKey)) {
+          circular.push(p.FullName || p.Name);
+          break;
+        }
+        visited.add(currentKey);
+
+        const managerKey = canonicalName(current.Manager);
+        if (!managerKey) break;
+
+        current = people.find(m => canonicalName(m.FullName || m.Name) === managerKey);
+        depth++;
+      }
+    });
+
+    if (circular.length > 0) {
+      issues.push({
+        type: 'error',
+        title: 'Circular reporting chains detected',
+        items: [...new Set(circular)]
+      });
+    }
+
+    return issues;
   }
 
   // --- People table ------------------------------------------------------
