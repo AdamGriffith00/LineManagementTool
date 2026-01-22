@@ -924,6 +924,7 @@
             <option value="overall" selected>Overall</option>
             <option value="region">By Region</option>
             <option value="office">By Office</option>
+            <option value="person">Find Person</option>
           </select>
         </div>
         <div class="field" id="orgSubGroupField" style="min-width:160px;margin-bottom:0;display:none;">
@@ -932,6 +933,12 @@
             <option value="">-- Select --</option>
           </select>
         </div>
+        <div class="field" id="orgPersonSearchField" style="min-width:220px;margin-bottom:0;display:none;">
+          <div class="field-label">Search person</div>
+          <input type="text" id="orgPersonSearch" placeholder="Type name..." list="orgPersonList">
+          <datalist id="orgPersonList"></datalist>
+        </div>
+        <button class="btn btn-ghost" id="orgClearBtn" style="align-self:flex-end;">Clear</button>
       </div>
       <div class="org-tree-wrap">
         <div id="orgTreeRoot" class="org-tree">
@@ -1700,6 +1707,10 @@
   const orgSubGroupSelect = document.getElementById('orgSubGroupSelect');
   const orgSubGroupLabel = document.getElementById('orgSubGroupLabel');
   const orgTreeRoot = document.getElementById('orgTreeRoot');
+  const orgPersonSearchField = document.getElementById('orgPersonSearchField');
+  const orgPersonSearch = document.getElementById('orgPersonSearch');
+  const orgPersonList = document.getElementById('orgPersonList');
+  const orgClearBtn = document.getElementById('orgClearBtn');
   let currentOrgView = 'overall'; // Track current view for external info
 
   // --- Helpers for the hierarchy view ---------------------------------------
@@ -2511,16 +2522,300 @@
     const mode = orgGroupBy.value;
     currentOrgView = mode;
 
+    // Hide all optional fields first
+    if (orgSubGroupField) orgSubGroupField.style.display = 'none';
+    if (orgPersonSearchField) orgPersonSearchField.style.display = 'none';
+
     if (mode === 'overall') {
-      // Hide sub-group selector and build overall view
-      if (orgSubGroupField) orgSubGroupField.style.display = 'none';
       buildOrganigramForGroup('overall');
+    } else if (mode === 'person') {
+      // Show person search
+      if (orgPersonSearchField) orgPersonSearchField.style.display = 'block';
+      populatePersonList();
+      orgTreeRoot.innerHTML = '<div class="subtle">Type a name to see their full reporting chain (managers above, reports below).</div>';
     } else {
       // Show sub-group selector and populate it
       if (orgSubGroupField) orgSubGroupField.style.display = 'block';
       if (orgSubGroupLabel) orgSubGroupLabel.textContent = mode === 'region' ? 'Region' : 'Office';
       populateSubGroupSelect(mode);
     }
+  }
+
+  function populatePersonList() {
+    if (!orgPersonList) return;
+    const people = state.people || [];
+    orgPersonList.innerHTML = '';
+    people.forEach(p => {
+      const name = p.FullName || p.Name || '';
+      if (name) {
+        const opt = document.createElement('option');
+        opt.value = name;
+        orgPersonList.appendChild(opt);
+      }
+    });
+  }
+
+  function onPersonSearchChange() {
+    const searchVal = (orgPersonSearch.value || '').trim();
+    if (!searchVal) return;
+
+    const people = state.people || [];
+    const person = people.find(p => {
+      const name = (p.FullName || p.Name || '').toLowerCase();
+      return name === searchVal.toLowerCase();
+    });
+
+    if (person) {
+      buildPersonHierarchyTree(person);
+    }
+  }
+
+  function buildPersonHierarchyTree(targetPerson) {
+    const people = state.people || [];
+    const targetKey = canonicalName(targetPerson.FullName || targetPerson.Name);
+
+    // Build a map of all people by key
+    const byKey = new Map();
+    people.forEach(p => {
+      const key = canonicalName(p.FullName || p.Name);
+      if (key) byKey.set(key, p);
+    });
+
+    // Find all ancestors (managers up the chain)
+    const ancestors = [];
+    let current = targetPerson;
+    while (current) {
+      const managerKey = canonicalName(current.Manager);
+      if (!managerKey) break;
+      const manager = byKey.get(managerKey);
+      if (!manager || ancestors.includes(manager)) break; // Prevent infinite loop
+      ancestors.unshift(manager); // Add to beginning
+      current = manager;
+    }
+
+    // Find all descendants (reports down the chain) recursively
+    function getDescendants(person, visited = new Set()) {
+      const personKey = canonicalName(person.FullName || person.Name);
+      if (visited.has(personKey)) return [];
+      visited.add(personKey);
+
+      const directReports = people.filter(p => {
+        const mgrKey = canonicalName(p.Manager);
+        return mgrKey === personKey;
+      });
+
+      const result = [];
+      directReports.forEach(report => {
+        result.push({ person: report, depth: 1 });
+        const subReports = getDescendants(report, visited);
+        subReports.forEach(sr => {
+          result.push({ person: sr.person, depth: sr.depth + 1 });
+        });
+      });
+      return result;
+    }
+
+    const descendants = getDescendants(targetPerson);
+
+    // Build the focused tree data
+    const treeData = [];
+
+    // Add ancestors
+    ancestors.forEach((p, idx) => {
+      treeData.push({
+        person: p,
+        level: idx,
+        isTarget: false,
+        isAncestor: true,
+        isDescendant: false
+      });
+    });
+
+    // Add target person
+    treeData.push({
+      person: targetPerson,
+      level: ancestors.length,
+      isTarget: true,
+      isAncestor: false,
+      isDescendant: false
+    });
+
+    // Add descendants
+    descendants.forEach(d => {
+      treeData.push({
+        person: d.person,
+        level: ancestors.length + d.depth,
+        isTarget: false,
+        isAncestor: false,
+        isDescendant: true
+      });
+    });
+
+    // Render the focused tree
+    renderPersonHierarchyTree(targetPerson, treeData, ancestors.length);
+  }
+
+  function renderPersonHierarchyTree(targetPerson, treeData, targetLevel) {
+    orgTreeRoot.innerHTML = '';
+
+    const targetName = targetPerson.FullName || targetPerson.Name;
+
+    // Add legend
+    const legend = document.createElement('div');
+    legend.className = 'org-legend';
+    legend.innerHTML = `
+      <span class="subtle">Showing hierarchy for <strong>${targetName}</strong>:</span>
+      <div class="org-legend-item"><div class="org-legend-color manager"></div> Managers (above)</div>
+      <div class="org-legend-item"><div class="org-legend-color selected"></div> Selected Person</div>
+      <div class="org-legend-item"><div class="org-legend-color report"></div> Reports (below)</div>
+    `;
+    orgTreeRoot.appendChild(legend);
+
+    if (treeData.length === 0) {
+      orgTreeRoot.innerHTML += '<div class="subtle">No hierarchy data found for this person.</div>';
+      return;
+    }
+
+    // Group by level
+    const levels = new Map();
+    let maxLevel = 0;
+    treeData.forEach(d => {
+      if (!levels.has(d.level)) levels.set(d.level, []);
+      levels.get(d.level).push(d);
+      if (d.level > maxLevel) maxLevel = d.level;
+    });
+
+    // Create container
+    const treeContainer = document.createElement('div');
+    treeContainer.className = 'org-tree-container';
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'org-tree-svg');
+    treeContainer.appendChild(svg);
+
+    const treeContent = document.createElement('div');
+    treeContent.className = 'org-tree-content';
+
+    const groupContainer = document.createElement('div');
+    groupContainer.className = 'org-group org-tree';
+    groupContainer.setAttribute('data-group-key', 'person-tree');
+
+    // Build hierarchy for connection lines
+    const nodes = [];
+    const nodeByName = new Map();
+
+    for (let level = 0; level <= maxLevel; level++) {
+      const levelData = levels.get(level) || [];
+      if (!levelData.length) continue;
+
+      const section = document.createElement('div');
+      section.className = 'org-level-section';
+
+      const labelText = level < targetLevel ? 'Management Chain' :
+                        level === targetLevel ? 'Selected Person' : 'Direct & Indirect Reports';
+
+      const label = document.createElement('div');
+      label.className = 'org-level-label';
+      label.textContent = levelText(level, targetLevel, levelData.length);
+      section.appendChild(label);
+
+      const row = document.createElement('div');
+      row.className = 'org-level-row';
+
+      levelData.forEach(d => {
+        const node = {
+          person: d.person,
+          key: canonicalName(d.person.FullName || d.person.Name),
+          managerKey: canonicalName(d.person.Manager),
+          personKey: canonicalName(d.person.FullName || d.person.Name),
+          children: [],
+          depth: level
+        };
+        nodes.push(node);
+        nodeByName.set(node.key, node);
+
+        const card = createPersonTreeCard(d, 'person-tree');
+        row.appendChild(card);
+      });
+
+      section.appendChild(row);
+      groupContainer.appendChild(section);
+    }
+
+    // Link children for connection lines
+    nodes.forEach(node => {
+      if (node.managerKey) {
+        const parent = nodeByName.get(node.managerKey);
+        if (parent) parent.children.push(node);
+      }
+    });
+
+    // Store for click handling
+    state.orgTreesByGroup = state.orgTreesByGroup || {};
+    state.orgTreesByGroup['person-tree'] = { nodes, roots: [], nodeByName };
+
+    treeContent.appendChild(groupContainer);
+    treeContainer.appendChild(treeContent);
+    orgTreeRoot.appendChild(treeContainer);
+
+    // Draw connection lines
+    requestAnimationFrame(() => {
+      drawConnectionLines(treeContainer, svg, nodes, nodeByName);
+      // Show all lines for person tree
+      svg.querySelectorAll('.org-connection-line').forEach(line => {
+        line.style.opacity = '0.4';
+      });
+    });
+  }
+
+  function levelText(level, targetLevel, count) {
+    if (level < targetLevel) {
+      const diff = targetLevel - level;
+      if (diff === 1) return 'Direct Manager';
+      return `Manager (+${diff} levels up)`;
+    } else if (level === targetLevel) {
+      return 'Selected Person';
+    } else {
+      const diff = level - targetLevel;
+      if (diff === 1) return `Direct Reports (${count})`;
+      return `Reports (+${diff} levels down) (${count})`;
+    }
+  }
+
+  function createPersonTreeCard(data, groupKey) {
+    const person = data.person;
+    const card = document.createElement('div');
+    card.className = 'org-card org-person-card';
+    card.style.cursor = 'pointer';
+
+    const personKey = canonicalName(person.FullName || person.Name);
+    card.dataset.personKey = personKey;
+    card.dataset.groupKey = groupKey;
+
+    // Apply highlighting based on role
+    if (data.isTarget) {
+      card.classList.add('org-highlight-selected');
+    } else if (data.isAncestor) {
+      card.classList.add('org-highlight-manager');
+    } else if (data.isDescendant) {
+      card.classList.add('org-highlight-report');
+    }
+
+    const status = (person.capStatus || '').toLowerCase();
+    const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
+    const capCls = status === 'over' ? 'cap-chip cap-over' : status === 'full' ? 'cap-chip cap-full' : 'cap-chip cap-under';
+
+    card.innerHTML = `
+      <div class="org-name">${person.FullName || person.Name || ''}</div>
+      <div class="org-meta">${[person.Grade || '', person.Office || '', person.Region || ''].filter(Boolean).join(' • ')}</div>
+      <div class="org-cap">
+        <span class="${capCls}"><span>${statusLabel}</span><strong>${person.currentReports || 0}/${person.Capacity || 0}</strong></span>
+      </div>
+    `;
+
+    card.addEventListener('click', onOrgPersonCardClick);
+
+    return card;
   }
 
   function populateSubGroupSelect(mode) {
@@ -2582,6 +2877,27 @@
 
   if (orgSubGroupSelect) {
     orgSubGroupSelect.addEventListener('change', onSubGroupSelectChange);
+  }
+
+  if (orgPersonSearch) {
+    orgPersonSearch.addEventListener('change', onPersonSearchChange);
+    orgPersonSearch.addEventListener('input', (e) => {
+      // Also trigger on selection from datalist
+      const val = e.target.value;
+      const people = state.people || [];
+      const match = people.find(p => (p.FullName || p.Name || '') === val);
+      if (match) onPersonSearchChange();
+    });
+  }
+
+  if (orgClearBtn) {
+    orgClearBtn.addEventListener('click', () => {
+      // Reset to Overall view
+      if (orgGroupBy) orgGroupBy.value = 'overall';
+      if (orgPersonSearch) orgPersonSearch.value = '';
+      if (orgSubGroupSelect) orgSubGroupSelect.value = '';
+      onOrgGroupByChange();
+    });
   }
 
   // --- Tabs --------------------------------------------------------------
