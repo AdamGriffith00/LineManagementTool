@@ -2659,11 +2659,16 @@
     fillFilterOptions();
     populateCapacityRegions();
     populateOfficeSelect(capacityOfficeSelect, (capacityRegionSelect && capacityRegionSelect.value) || 'Any');
-    updateCapacityResults();
+    // Don't auto-populate results - require user to click Search
     const hasData = (state.people || []).length>0;
-    if (!hasData){
+    if (hasData){
+      // Clear results and show instructions
+      if (capacityResults) capacityResults.innerHTML = '<div class="subtle">Use the filters above and click <strong>Search</strong> to find managers.</div>';
+      fmResults.innerHTML = '<div class="subtle">Use the filters above and click <strong>Suggest</strong> to find managers.</div>';
+    } else {
       fmResults.innerHTML = '<div class="subtle">Upload a file first, then use the filters and click <strong>Suggest</strong>.</div>';
       orgTreeRoot.innerHTML = '<div class="subtle">Upload a file on the Overview tab to see the organigram.</div>';
+      if (capacityResults) capacityResults.innerHTML = '<div class="subtle">Upload a file first to search for managers.</div>';
     }
   }
 
