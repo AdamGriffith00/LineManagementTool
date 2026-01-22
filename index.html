@@ -767,6 +767,28 @@
       position: relative;
     }
 
+    .org-total-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      background: var(--bg-card);
+      border-radius: 8px;
+      border: 1px solid var(--border-soft);
+    }
+
+    .org-total-label {
+      font-size: 13px;
+      color: var(--text-soft);
+    }
+
+    .org-total-count {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent-yellow);
+    }
+
     .org-tree-inner {
       transform-origin: top left;
       transition: transform 0.2s ease;
@@ -2860,24 +2882,12 @@
     // Add capacity status class for color mode
     card.classList.add(`cap-status-${status || 'under'}`);
 
-    // Calculate team size in current group
-    const peopleInGroup = groupPeople || state.people || [];
-    const teamInGroup = getTeamSizeInGroup(personKey, peopleInGroup);
-    const displayLabel = groupLabel && groupLabel !== 'Overall' ? groupLabel : '';
-
-    let teamBadgeHtml = '';
-    if (teamInGroup > 0) {
-      const labelText = displayLabel ? `Team in ${displayLabel}:` : 'Team:';
-      teamBadgeHtml = `<div class="org-team-badge">${labelText} <span class="team-count">${teamInGroup}</span></div>`;
-    }
-
     card.innerHTML = `
       <div class="org-name">${person.FullName || person.Name || ''}</div>
       <div class="org-meta">${[person.Grade || '', person.Office || ''].filter(Boolean).join(' • ')}</div>
       <div class="org-cap">
         <span class="${capCls}"><span>${statusLabel}</span><strong>${person.currentReports || 0}/${person.Capacity || 0}</strong></span>
       </div>
-      ${teamBadgeHtml}
     `;
 
     return card;
@@ -3182,6 +3192,15 @@
         return (a.person.FullName || '').localeCompare(b.person.FullName || '');
       });
     });
+
+    // Add total header
+    const totalHeader = document.createElement('div');
+    totalHeader.className = 'org-total-header';
+    totalHeader.innerHTML = `
+      <span class="org-total-label">${groupLabel || 'Total'}</span>
+      <span class="org-total-count">${groupPeople.length} people</span>
+    `;
+    orgTreeRoot.appendChild(totalHeader);
 
     // Add legend
     const legend = document.createElement('div');
@@ -3645,6 +3664,15 @@
 
     const targetName = targetPerson.FullName || targetPerson.Name;
 
+    // Add total header
+    const totalHeader = document.createElement('div');
+    totalHeader.className = 'org-total-header';
+    totalHeader.innerHTML = `
+      <span class="org-total-label">Hierarchy for ${targetName}</span>
+      <span class="org-total-count">${treeData.length} people</span>
+    `;
+    orgTreeRoot.appendChild(totalHeader);
+
     // Add legend
     const legend = document.createElement('div');
     legend.className = 'org-legend';
@@ -3798,22 +3826,12 @@
     // Add capacity status class for color mode
     card.classList.add(`cap-status-${status || 'under'}`);
 
-    // Calculate total team size
-    const allPeople = state.people || [];
-    const totalTeam = getTotalTeamSize(personKey, allPeople);
-
-    let teamBadgeHtml = '';
-    if (totalTeam > 0) {
-      teamBadgeHtml = `<div class="org-team-badge">Total team: <span class="team-count">${totalTeam}</span></div>`;
-    }
-
     card.innerHTML = `
       <div class="org-name">${person.FullName || person.Name || ''}</div>
       <div class="org-meta">${[person.Grade || '', person.Office || '', person.Region || ''].filter(Boolean).join(' • ')}</div>
       <div class="org-cap">
         <span class="${capCls}"><span>${statusLabel}</span><strong>${person.currentReports || 0}/${person.Capacity || 0}</strong></span>
       </div>
-      ${teamBadgeHtml}
     `;
 
     card.addEventListener('click', onOrgPersonCardClick);
@@ -3912,6 +3930,27 @@
     if (orgTreeRoot) {
       orgTreeRoot.style.transform = `scale(${orgZoomLevel})`;
       orgTreeRoot.style.transformOrigin = 'top left';
+
+      // When zoomed out, we need to adjust width to compensate
+      // This ensures content doesn't get clipped and the container can show more
+      if (orgZoomLevel < 1) {
+        // Scale up the width inversely so more content fits
+        const widthPercent = (100 / orgZoomLevel);
+        orgTreeRoot.style.width = `${widthPercent}%`;
+      } else {
+        orgTreeRoot.style.width = '100%';
+      }
+    }
+
+    // Adjust container max-height based on zoom
+    // When zoomed out, allow more vertical space to show more content
+    const baseMaxHeight = 520;
+    if (orgZoomLevel < 1) {
+      // When zoomed out, increase max-height to show more content
+      const adjustedMaxHeight = baseMaxHeight / orgZoomLevel;
+      treeWrap.style.maxHeight = `${adjustedMaxHeight}px`;
+    } else {
+      treeWrap.style.maxHeight = `${baseMaxHeight}px`;
     }
 
     // Update display
