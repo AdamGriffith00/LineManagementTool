@@ -1267,6 +1267,11 @@
       <div class="stack">
         <div class="card">
           <div class="pill-label">Find a line manager</div>
+          <div class="field">
+            <div class="field-label">Recommend for person (optional)</div>
+            <input type="text" id="capacity-recommend-for" placeholder="Type name..." list="capacity-person-list">
+            <datalist id="capacity-person-list"></datalist>
+          </div>
           <div class="filters-row">
             <div class="field">
               <div class="multi-select" data-filter="region">
@@ -1314,11 +1319,6 @@
 
         <div class="card" id="manager-capacity-panel">
           <div class="pill-label">Line managers by region</div>
-          <div class="field">
-            <div class="field-label">Recommend for person (optional)</div>
-            <input type="text" id="capacity-recommend-for" placeholder="Type name..." list="capacity-person-list">
-            <datalist id="capacity-person-list"></datalist>
-          </div>
           <div class="field">
             <div class="field-label">Region</div>
             <select id="capacity-region">
