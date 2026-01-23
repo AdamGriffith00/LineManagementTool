@@ -659,12 +659,13 @@
       z-index: 9999;
     }
     .pref-modal {
-      background: var(--panel-bg);
+      background: #1a1d24;
       border: 1px solid var(--border-soft);
-      border-radius: var(--radius-lg);
+      border-radius: 12px;
       padding: 20px;
       min-width: 320px;
       max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     }
     .pref-modal h3 {
       margin: 0 0 16px 0;
@@ -717,6 +718,11 @@
     }
     .pref-indicator.wants { background: #28a745; }
     .pref-indicator.doesnt { background: #ff6b6b; }
+
+    /* Hide preference indicators in organigram when toggle is off */
+    .org-tree.hide-prefs .pref-indicator {
+      display: none;
+    }
 
     /* Capacity chips --------------------------------------------------- */
 
@@ -1471,6 +1477,10 @@
         <label class="capacity-toggle" title="Colour cards by capacity status">
           <input type="checkbox" id="colorByCapacity">
           <span class="toggle-label">Colour by capacity</span>
+        </label>
+        <label class="capacity-toggle" title="Show manager preference indicators">
+          <input type="checkbox" id="showPrefsToggle" checked>
+          <span class="toggle-label">Show preferences</span>
         </label>
       </div>
       <div class="org-tree-wrap">
@@ -4322,6 +4332,16 @@
     colorByCapacityCheckbox.addEventListener('change', () => {
       if (orgTreeRoot) {
         orgTreeRoot.classList.toggle('color-by-capacity', colorByCapacityCheckbox.checked);
+      }
+    });
+  }
+
+  // Show preferences toggle
+  const showPrefsToggle = document.getElementById('showPrefsToggle');
+  if (showPrefsToggle) {
+    showPrefsToggle.addEventListener('change', () => {
+      if (orgTreeRoot) {
+        orgTreeRoot.classList.toggle('hide-prefs', !showPrefsToggle.checked);
       }
     });
   }
