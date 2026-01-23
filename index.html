@@ -1581,6 +1581,28 @@
     return clean;
   }
 
+  // Simplify full grade names to level names for filtering
+  // e.g. "Senior Cost Manager" → "Senior", "Cost Manager" → "Professional"
+  function simplifyGrade(value){
+    const clean = tidyLabel(value);
+    const lower = clean.toLowerCase();
+    // Keep director-level grades as-is
+    if (lower === 'senior director') return 'Senior Director';
+    if (lower === 'director') return 'Director';
+    if (lower === 'project director') return 'Project Director';
+    if (lower.includes('associate')) return 'Associate';
+    // Simplify other grades to their level prefix
+    if (lower.includes('executive')) return 'Executive';
+    if (lower.includes('senior')) return 'Senior';
+    if (lower.includes('assistant')) return 'Assistant';
+    if (lower.includes('graduate')) return 'Graduate';
+    if (lower.includes('trainee')) return 'Trainee';
+    // Bare "Cost Manager" or "Quantity Surveyor" = Professional
+    if (lower === 'cost manager' || lower === 'quantity surveyor') return 'Professional';
+    // Fallback to original
+    return clean;
+  }
+
   function buildKeyMap(firstRow){
     const keys = Object.keys(firstRow || {});
     const keysNorm = keys.map(k=>norm(k));
@@ -2354,7 +2376,8 @@
     selectedOffices = [];
     selectedGrades = [];
     multiSelectOptions.region = uniq(people.map(p=>p.Region));
-    multiSelectOptions.grade = uniq(people.map(p=>p.Grade));
+    // Use simplified grade levels for filter options
+    multiSelectOptions.grade = uniq(people.map(p=>simplifyGrade(p.Grade)));
     renderMultiSelectOptions('region', multiSelectOptions.region);
     updateMultiSelectSummary('region', selectedRegions);
     renderMultiSelectOptions('grade', multiSelectOptions.grade);
@@ -2420,7 +2443,7 @@
       if (!isManager) return false;
       if (selectedRegions.length && !selectedRegions.includes(p.Region || '')) return false;
       if (selectedOffices.length && !selectedOffices.includes(p.Office || '')) return false;
-      if (selectedGrades.length && !selectedGrades.includes(p.Grade || '')) return false;
+      if (selectedGrades.length && !selectedGrades.includes(simplifyGrade(p.Grade))) return false;
       if ((p.freeSlots || 0) < minFree) return false;
       return true;
     }).sort((a,b)=>{
