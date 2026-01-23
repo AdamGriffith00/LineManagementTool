@@ -616,21 +616,107 @@
     tbody tr:hover { background: #171b27; }
 
     /* Row highlighting for issues */
-    tbody tr.row-over-capacity {
-      background: rgba(255, 107, 107, 0.1);
-    }
-    tbody tr.row-over-capacity td:first-child {
-      border-left: 3px solid #ff6b6b;
-    }
     tbody tr.row-orphan {
       background: rgba(255, 193, 7, 0.1);
     }
     tbody tr.row-orphan td:first-child {
       border-left: 3px solid #ffc107;
     }
-    tbody tr.row-over-capacity.row-orphan {
+
+    /* Manager preference highlighting */
+    tbody tr.row-wants-to-manage {
+      background: rgba(40, 167, 69, 0.15);
+    }
+    tbody tr.row-wants-to-manage td:first-child {
+      border-left: 3px solid #28a745;
+    }
+    tbody tr.row-doesnt-want-to-manage {
       background: rgba(255, 107, 107, 0.15);
     }
+    tbody tr.row-doesnt-want-to-manage td:first-child {
+      border-left: 3px solid #ff6b6b;
+    }
+
+    /* Clickable name in table */
+    .person-name-link {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 2px;
+    }
+    .person-name-link:hover {
+      color: var(--accent);
+    }
+
+    /* Person preference modal */
+    .pref-modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .pref-modal {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      min-width: 320px;
+      max-width: 400px;
+    }
+    .pref-modal h3 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+    }
+    .pref-modal .field {
+      margin-bottom: 12px;
+    }
+    .pref-modal label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-soft);
+      margin-bottom: 8px;
+    }
+    .pref-modal label:hover {
+      background: var(--badge-soft);
+    }
+    .pref-modal label.selected {
+      border-color: var(--accent);
+      background: rgba(99, 102, 241, 0.1);
+    }
+    .pref-modal textarea {
+      width: 100%;
+      min-height: 60px;
+      background: var(--input-bg);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-md);
+      color: inherit;
+      padding: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      resize: vertical;
+    }
+    .pref-modal .btn-row {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 16px;
+    }
+    .pref-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-left: 6px;
+    }
+    .pref-indicator.wants { background: #28a745; }
+    .pref-indicator.doesnt { background: #ff6b6b; }
 
     /* Capacity chips --------------------------------------------------- */
 
@@ -1469,6 +1555,36 @@
   </div>
 </div>
 
+<!-- Person Preference Modal -->
+<div class="pref-modal-overlay" id="prefModal" style="display:none;">
+  <div class="pref-modal">
+    <h3 id="prefModalTitle">Manager Preferences</h3>
+    <div class="field">
+      <div class="field-label">Line management preference</div>
+      <label id="prefWants">
+        <input type="radio" name="managePref" value="wants">
+        <span>Wants to be a line manager / wants more reports</span>
+      </label>
+      <label id="prefDoesnt">
+        <input type="radio" name="managePref" value="doesnt">
+        <span>Does not want to be a line manager</span>
+      </label>
+      <label id="prefNone">
+        <input type="radio" name="managePref" value="none">
+        <span>No preference set</span>
+      </label>
+    </div>
+    <div class="field">
+      <div class="field-label">Notes (optional)</div>
+      <textarea id="prefComment" placeholder="Add any notes about this person..."></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="prefCancel">Cancel</button>
+      <button class="btn" id="prefSave">Save</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <script>
 (function(){
@@ -1537,6 +1653,44 @@
       console.warn('Could not clear localStorage:', e);
     }
   }
+
+  // --- Manager preference storage (persists by name across uploads) --------
+  const PREFS_STORAGE_KEY = 'lineManagementToolPrefs';
+  let managerPrefs = {}; // { canonicalName: { wantsToManage: true/false/null, comment: '' } }
+
+  function loadPrefs(){
+    try {
+      const stored = localStorage.getItem(PREFS_STORAGE_KEY);
+      if (stored) {
+        managerPrefs = JSON.parse(stored) || {};
+      }
+    } catch(e){
+      console.warn('Could not load preferences:', e);
+      managerPrefs = {};
+    }
+  }
+
+  function savePrefs(){
+    try {
+      localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(managerPrefs));
+    } catch(e){
+      console.warn('Could not save preferences:', e);
+    }
+  }
+
+  function getPersonPref(name){
+    const key = canonicalKey(name);
+    return managerPrefs[key] || { wantsToManage: null, comment: '' };
+  }
+
+  function setPersonPref(name, pref){
+    const key = canonicalKey(name);
+    managerPrefs[key] = pref;
+    savePrefs();
+  }
+
+  // Load preferences on startup
+  loadPrefs();
 
   const GRADE_ORDER = [
     'Senior Director',
@@ -2202,11 +2356,6 @@
     peopleBody.innerHTML = filtered.map(p=>{
       const rowClasses = [];
 
-      // Check if over capacity
-      if (p.capStatus === 'over') {
-        rowClasses.push('row-over-capacity');
-      }
-
       // Check if orphan (manager not in system)
       const managerName = p.Manager;
       if (managerName && managerName.trim()) {
@@ -2216,9 +2365,26 @@
         }
       }
 
+      // Check manager preference
+      const pref = getPersonPref(p.FullName);
+      if (pref.wantsToManage === true) {
+        rowClasses.push('row-wants-to-manage');
+      } else if (pref.wantsToManage === false) {
+        rowClasses.push('row-doesnt-want-to-manage');
+      }
+
+      // Build name cell with click handler and preference indicator
+      let prefIndicator = '';
+      if (pref.wantsToManage === true) {
+        prefIndicator = '<span class="pref-indicator wants" title="Wants to be a line manager"></span>';
+      } else if (pref.wantsToManage === false) {
+        prefIndicator = '<span class="pref-indicator doesnt" title="Does not want to be a line manager"></span>';
+      }
+      const nameHtml = `<span class="person-name-link" data-person="${(p.FullName || '').replace(/"/g, '&quot;')}" title="${pref.comment ? pref.comment : 'Click to set preferences'}">${p.FullName || ''}${prefIndicator}</span>`;
+
       return `
         <tr class="${rowClasses.join(' ')}">
-          <td>${p.FullName || ''}</td>
+          <td>${nameHtml}</td>
           <td>${p.Grade || ''}</td>
           <td>${p.GradeLevel || ''}</td>
           <td>${p.Discipline || ''}</td>
@@ -2236,6 +2402,91 @@
   }
 
   peopleSearch.addEventListener('input', renderPeopleTable);
+
+  // --- Person preference modal -------------------------------------------
+  const prefModal = document.getElementById('prefModal');
+  const prefModalTitle = document.getElementById('prefModalTitle');
+  const prefComment = document.getElementById('prefComment');
+  const prefWants = document.getElementById('prefWants');
+  const prefDoesnt = document.getElementById('prefDoesnt');
+  const prefNone = document.getElementById('prefNone');
+  const prefSave = document.getElementById('prefSave');
+  const prefCancel = document.getElementById('prefCancel');
+  let currentPrefPerson = null;
+
+  function openPrefModal(personName){
+    currentPrefPerson = personName;
+    prefModalTitle.textContent = personName;
+    const pref = getPersonPref(personName);
+
+    // Set radio button state
+    prefWants.classList.remove('selected');
+    prefDoesnt.classList.remove('selected');
+    prefNone.classList.remove('selected');
+
+    if (pref.wantsToManage === true) {
+      prefWants.querySelector('input').checked = true;
+      prefWants.classList.add('selected');
+    } else if (pref.wantsToManage === false) {
+      prefDoesnt.querySelector('input').checked = true;
+      prefDoesnt.classList.add('selected');
+    } else {
+      prefNone.querySelector('input').checked = true;
+      prefNone.classList.add('selected');
+    }
+
+    prefComment.value = pref.comment || '';
+    prefModal.style.display = 'flex';
+  }
+
+  function closePrefModal(){
+    prefModal.style.display = 'none';
+    currentPrefPerson = null;
+  }
+
+  // Update label selection styling on radio change
+  [prefWants, prefDoesnt, prefNone].forEach(label => {
+    label.querySelector('input').addEventListener('change', () => {
+      prefWants.classList.remove('selected');
+      prefDoesnt.classList.remove('selected');
+      prefNone.classList.remove('selected');
+      label.classList.add('selected');
+    });
+  });
+
+  prefCancel.addEventListener('click', closePrefModal);
+  prefModal.addEventListener('click', (e) => {
+    if (e.target === prefModal) closePrefModal();
+  });
+
+  prefSave.addEventListener('click', () => {
+    if (!currentPrefPerson) return;
+
+    let wantsToManage = null;
+    if (prefWants.querySelector('input').checked) {
+      wantsToManage = true;
+    } else if (prefDoesnt.querySelector('input').checked) {
+      wantsToManage = false;
+    }
+
+    setPersonPref(currentPrefPerson, {
+      wantsToManage,
+      comment: prefComment.value.trim()
+    });
+
+    closePrefModal();
+    renderPeopleTable();
+    renderAll(); // Refresh organigram too
+  });
+
+  // Click handler for person names in table
+  peopleBody.addEventListener('click', (e) => {
+    const link = e.target.closest('.person-name-link');
+    if (link) {
+      const personName = link.dataset.person;
+      if (personName) openPrefModal(personName);
+    }
+  });
 
   // --- Find a manager ----------------------------------------------------
   const fmFreeCap = document.getElementById('fmFreeCap');
@@ -2450,6 +2701,9 @@
     const candidates = people.filter(p=>{
       const isManager = p.IsManager || p.currentReports>0;
       if (!isManager) return false;
+      // Exclude people who don't want to be managers
+      const pref = getPersonPref(p.FullName);
+      if (pref.wantsToManage === false) return false;
       if (selectedRegions.length && !selectedRegions.includes(p.Region || '')) return false;
       if (selectedOffices.length && !selectedOffices.includes(p.Office || '')) return false;
       if (selectedGrades.length && !selectedGrades.includes(simplifyGrade(p.Grade))) return false;
@@ -2592,8 +2846,11 @@
 
     const managers = (state.people || []).filter(p => p.IsManager);
 
-    // Exclude the target person from being their own manager
+    // Exclude the target person from being their own manager and people who don't want to manage
     const filtered = managers.filter(p => {
+      // Exclude people who don't want to be managers
+      const pref = getPersonPref(p.FullName);
+      if (pref.wantsToManage === false) return false;
       if (targetPerson) {
         const pKey = canonicalName(p.FullName || p.Name);
         const targetKey = canonicalName(targetPerson.FullName || targetPerson.Name);
@@ -2933,8 +3190,21 @@
     // Add capacity status class for colour mode
     card.classList.add(`cap-status-${status || 'under'}`);
 
+    // Get preference for this person
+    const pref = getPersonPref(person.FullName || person.Name || '');
+    let prefIndicator = '';
+    if (pref.wantsToManage === true) {
+      prefIndicator = '<span class="pref-indicator wants" title="Wants to be a line manager"></span>';
+    } else if (pref.wantsToManage === false) {
+      prefIndicator = '<span class="pref-indicator doesnt" title="Does not want to be a line manager"></span>';
+    }
+
+    // Build tooltip with comment if present
+    const tooltipText = pref.comment ? pref.comment.replace(/"/g, '&quot;') : '';
+    const titleAttr = tooltipText ? `title="${tooltipText}"` : '';
+
     card.innerHTML = `
-      <div class="org-name">${person.FullName || person.Name || ''}</div>
+      <div class="org-name" ${titleAttr}>${person.FullName || person.Name || ''}${prefIndicator}</div>
       <div class="org-meta">${[person.Grade || '', person.Office || ''].filter(Boolean).join(' • ')}</div>
       <div class="org-cap">
         <span class="${capCls}"><span>${statusLabel}</span><strong>${person.currentReports || 0}/${person.Capacity || 0}</strong></span>
@@ -3872,8 +4142,21 @@
     // Add capacity status class for colour mode
     card.classList.add(`cap-status-${status || 'under'}`);
 
+    // Get preference for this person
+    const pref = getPersonPref(person.FullName || person.Name || '');
+    let prefIndicator = '';
+    if (pref.wantsToManage === true) {
+      prefIndicator = '<span class="pref-indicator wants" title="Wants to be a line manager"></span>';
+    } else if (pref.wantsToManage === false) {
+      prefIndicator = '<span class="pref-indicator doesnt" title="Does not want to be a line manager"></span>';
+    }
+
+    // Build tooltip with comment if present
+    const tooltipText = pref.comment ? pref.comment.replace(/"/g, '&quot;') : '';
+    const titleAttr = tooltipText ? `title="${tooltipText}"` : '';
+
     card.innerHTML = `
-      <div class="org-name">${person.FullName || person.Name || ''}</div>
+      <div class="org-name" ${titleAttr}>${person.FullName || person.Name || ''}${prefIndicator}</div>
       <div class="org-meta">${[person.Grade || '', person.Office || '', person.Region || ''].filter(Boolean).join(' • ')}</div>
       <div class="org-cap">
         <span class="${capCls}"><span>${statusLabel}</span><strong>${person.currentReports || 0}/${person.Capacity || 0}</strong></span>
