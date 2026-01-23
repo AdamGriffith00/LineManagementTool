@@ -2365,12 +2365,23 @@
     fmClearBtn.disabled = !hasData;
   }
 
-  function renderFindManagerResults(list){
+  function renderFindManagerResults(list, targetPerson){
     if (!list.length){
       fmResults.innerHTML = '<div class="subtle">No managers match those filters.</div>';
       return;
     }
     fmResults.innerHTML = list.map(p=>{
+      let scoreHtml = '';
+      if (targetPerson) {
+        const { score, reasons } = calculateRecommendationScore(p, targetPerson);
+        const scoreClass = score >= 60 ? 'high' : score >= 35 ? 'medium' : 'low';
+        scoreHtml = `
+          <div class="recommend-score">
+            <span class="recommend-badge ${scoreClass}">Score: ${score}</span>
+            <div class="recommend-reasons">${reasons.join(' • ')}</div>
+          </div>
+        `;
+      }
       return `
         <div class="manager-row">
           <div class="manager-main">
@@ -2382,6 +2393,7 @@
               ${p.Region ? `<span>${p.Region}</span>` : ''}
             </div>
           </div>
+          ${scoreHtml}
           ${capacityChip(p,{showIfNonManager:true})}
         </div>
       `;
@@ -2393,6 +2405,16 @@
   fmSearchBtn.addEventListener('click', ()=>{
     const people = state.people || [];
     const minFree = parseInt(fmFreeCap.value || '0', 10);
+
+    // Check if recommending for a specific person
+    const recommendInput = document.getElementById('capacity-recommend-for');
+    const recommendForName = recommendInput ? recommendInput.value.trim() : '';
+    let targetPerson = null;
+    if (recommendForName) {
+      const targetKey = canonicalKey(recommendForName);
+      targetPerson = people.find(p => p.fullNameKey === targetKey);
+    }
+
     const candidates = people.filter(p=>{
       const isManager = p.IsManager || p.currentReports>0;
       if (!isManager) return false;
@@ -2402,11 +2424,17 @@
       if ((p.freeSlots || 0) < minFree) return false;
       return true;
     }).sort((a,b)=>{
+      // If recommending for a person, sort by score first
+      if (targetPerson) {
+        const scoreA = calculateRecommendationScore(a, targetPerson).score;
+        const scoreB = calculateRecommendationScore(b, targetPerson).score;
+        if (scoreB !== scoreA) return scoreB - scoreA;
+      }
       const freeDiff = (b.freeSlots||0) - (a.freeSlots||0);
       if (freeDiff !== 0) return freeDiff;
       return a.FullName.localeCompare(b.FullName);
     });
-    renderFindManagerResults(candidates);
+    renderFindManagerResults(candidates, targetPerson);
   });
 
   fmClearBtn.addEventListener('click', ()=>{
@@ -2420,6 +2448,8 @@
     resetMultiSelectSummary('office');
     resetMultiSelectSummary('grade');
     fmFreeCap.value = 1;
+    const recommendInput = document.getElementById('capacity-recommend-for');
+    if (recommendInput) recommendInput.value = '';
     fmResults.innerHTML = '<div class="subtle">Cleared. Set filters and click <strong>Suggest</strong>.</div>';
   });
 
@@ -2485,12 +2515,17 @@
 
     // Grade appropriateness bonus (up to 20 points)
     // Managers should ideally be 1-2 grades above the person
-    const gradeOrder = ['Trainee', 'Graduate', 'Consultant', 'Senior Consultant', 'Associate Director', 'Director', 'Senior Director'];
-    const targetGradeIdx = gradeOrder.findIndex(g => (targetPerson.Grade || '').includes(g));
-    const managerGradeIdx = gradeOrder.findIndex(g => (manager.Grade || '').includes(g));
+    // Use GRADE_ORDER which goes from highest (index 0) to lowest (index 9)
+    const findGradeIdx = (grade) => {
+      const g = (grade || '').toLowerCase();
+      return GRADE_ORDER.findIndex(go => g.includes(go.toLowerCase()));
+    };
+    const targetGradeIdx = findGradeIdx(targetPerson.Grade);
+    const managerGradeIdx = findGradeIdx(manager.Grade);
 
     if (targetGradeIdx >= 0 && managerGradeIdx >= 0) {
-      const diff = managerGradeIdx - targetGradeIdx;
+      // diff > 0 means manager is more senior (lower index in GRADE_ORDER)
+      const diff = targetGradeIdx - managerGradeIdx;
       if (diff >= 1 && diff <= 2) {
         score += 20;
         reasons.push('Appropriate grade level');
