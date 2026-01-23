@@ -2438,6 +2438,15 @@
       targetPerson = people.find(p => p.fullNameKey === targetKey);
     }
 
+    // Helper to get grade seniority index (lower = more senior)
+    const getGradeIndex = (grade) => {
+      const g = (grade || '').toLowerCase();
+      const idx = GRADE_ORDER.findIndex(go => g.includes(go.toLowerCase()));
+      return idx >= 0 ? idx : GRADE_ORDER.length; // Unknown grades treated as lowest
+    };
+
+    const targetGradeIdx = targetPerson ? getGradeIndex(targetPerson.Grade) : null;
+
     const candidates = people.filter(p=>{
       const isManager = p.IsManager || p.currentReports>0;
       if (!isManager) return false;
@@ -2445,6 +2454,11 @@
       if (selectedOffices.length && !selectedOffices.includes(p.Office || '')) return false;
       if (selectedGrades.length && !selectedGrades.includes(simplifyGrade(p.Grade))) return false;
       if ((p.freeSlots || 0) < minFree) return false;
+      // If recommending for a person, only show candidates at same level or above
+      if (targetPerson && targetGradeIdx !== null) {
+        const candidateGradeIdx = getGradeIndex(p.Grade);
+        if (candidateGradeIdx > targetGradeIdx) return false; // Lower seniority = higher index
+      }
       return true;
     }).sort((a,b)=>{
       // If recommending for a person, sort by score first
