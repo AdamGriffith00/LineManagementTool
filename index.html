@@ -7,10 +7,6 @@
 
   <!-- SheetJS for XLSX/XLS support -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- html2canvas for PNG export -->
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-  <!-- jsPDF for PDF export -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <style>
     :root {
@@ -866,19 +862,7 @@
       color: var(--text-main);
     }
 
-    .export-controls {
-      display: flex;
-      gap: 6px;
-      margin-left: 16px;
-      align-items: flex-end;
-    }
-
-    .export-controls .btn {
-      padding: 6px 12px;
-      font-size: 11px;
-    }
-
-    /* Capacity color mode */
+    /* Capacity colour mode */
     .org-tree.color-by-capacity .org-person-card.cap-status-over {
       background: rgba(231, 76, 60, 0.15);
       border-color: rgba(231, 76, 60, 0.5);
@@ -1006,17 +990,6 @@
       text-align: center;
     }
 
-    .org-person-card.org-highlight-manager {
-      box-shadow: 0 0 0 4px #ffd500;
-      transform: scale(1.03);
-      z-index: 2;
-    }
-
-    .org-person-card.org-highlight-report {
-      box-shadow: 0 0 0 3px #ffd500;
-      z-index: 1;
-    }
-
     .org-name { font-weight: 700; font-size: 13px; }
     .org-meta { color: var(--text-soft); font-size: 12px; margin-top: 2px; }
     .org-cap { margin-top: 6px; display: flex; justify-content: center; }
@@ -1086,17 +1059,17 @@
       transition: opacity 0.3s ease;
     }
 
-    /* Line to manager - blue/cyan */
+    /* Line to manager - orange (RGB: 218, 79, 39) */
     .org-connection-line.show-manager {
       opacity: 1;
-      stroke: #4ecdc4;
+      stroke: #DA4F27;
       stroke-width: 3;
     }
 
-    /* Line to direct report - yellow */
+    /* Line to direct report - green (RGB: 0, 19, 102) */
     .org-connection-line.show-report {
       opacity: 1;
-      stroke: var(--accent-yellow);
+      stroke: #001366;
       stroke-width: 3;
     }
 
@@ -1105,46 +1078,23 @@
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
-    /* Selected person - yellow */
+    /* Selected person - yellow (RGB: 247, 196, 0) */
     .org-person-card.org-highlight-selected {
-      box-shadow: 0 0 0 4px var(--accent-yellow);
+      box-shadow: 0 0 0 4px #F7C400;
       transform: scale(1.05);
       z-index: 10;
     }
 
-    /* Manager of selected person - cyan/teal */
+    /* Manager of selected person - orange (RGB: 218, 79, 39) */
     .org-person-card.org-highlight-manager {
-      box-shadow: 0 0 0 4px #4ecdc4;
+      box-shadow: 0 0 0 4px #DA4F27;
       transform: scale(1.03);
       z-index: 5;
     }
 
-    /* Over-capacity manager - subtle indicator on organigram */
-    .org-person-card.org-over-capacity {
-      border-left: 3px solid #ff6b6b;
-    }
-
-    /* Team size badge */
-    .org-team-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 10px;
-      color: var(--text-soft);
-      margin-top: 4px;
-    }
-
-    .org-team-badge .team-count {
-      background: rgba(255, 212, 0, 0.15);
-      color: var(--accent-yellow);
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-weight: 600;
-    }
-
-    /* Direct report of selected person - yellow (lighter) */
+    /* Direct report of selected person - green (RGB: 0, 19, 102) */
     .org-person-card.org-highlight-report {
-      box-shadow: 0 0 0 3px rgba(255, 212, 0, 0.7);
+      box-shadow: 0 0 0 3px #001366;
       z-index: 5;
     }
 
@@ -1161,7 +1111,7 @@
       margin-bottom: 16px;
     }
 
-    /* Legend for the relationship colors */
+    /* Legend for the relationship colours */
     .org-legend {
       display: flex;
       gap: 16px;
@@ -1182,9 +1132,9 @@
       border-radius: 3px;
     }
 
-    .org-legend-color.selected { background: var(--accent-yellow); }
-    .org-legend-color.manager { background: #4ecdc4; }
-    .org-legend-color.report { background: rgba(255, 212, 0, 0.7); }
+    .org-legend-color.selected { background: #F7C400; }
+    .org-legend-color.manager { background: #DA4F27; }
+    .org-legend-color.report { background: #001366; }
 
     /* Out-of-group relationship info */
     .org-external-info {
@@ -1432,14 +1382,10 @@
           <button class="zoom-btn" id="zoomIn" title="Zoom in">+</button>
           <button class="zoom-btn" id="zoomReset" title="Reset zoom">⟲</button>
         </div>
-        <label class="capacity-toggle" title="Color cards by capacity status">
+        <label class="capacity-toggle" title="Colour cards by capacity status">
           <input type="checkbox" id="colorByCapacity">
-          <span class="toggle-label">Color by capacity</span>
+          <span class="toggle-label">Colour by capacity</span>
         </label>
-        <div class="export-controls">
-          <button class="btn btn-ghost" id="exportOrgPng" title="Export as PNG">Export PNG</button>
-          <button class="btn btn-ghost" id="exportOrgPdf" title="Export as PDF">Export PDF</button>
-        </div>
       </div>
       <div class="org-tree-wrap">
         <div id="orgTreeRoot" class="org-tree">
@@ -2874,12 +2820,7 @@
     const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
     const capCls = status === 'over' ? 'cap-chip cap-over' : status === 'full' ? 'cap-chip cap-full' : 'cap-chip cap-under';
 
-    // Highlight over-capacity managers
-    if (status === 'over') {
-      card.classList.add('org-over-capacity');
-    }
-
-    // Add capacity status class for color mode
+    // Add capacity status class for colour mode
     card.classList.add(`cap-status-${status || 'under'}`);
 
     card.innerHTML = `
@@ -3818,12 +3759,7 @@
     const statusLabel = status === 'over' ? 'Over' : status === 'full' ? 'At' : 'Under';
     const capCls = status === 'over' ? 'cap-chip cap-over' : status === 'full' ? 'cap-chip cap-full' : 'cap-chip cap-under';
 
-    // Highlight over-capacity managers
-    if (status === 'over') {
-      card.classList.add('org-over-capacity');
-    }
-
-    // Add capacity status class for color mode
+    // Add capacity status class for colour mode
     card.classList.add(`cap-status-${status || 'under'}`);
 
     card.innerHTML = `
@@ -3988,7 +3924,7 @@
     });
   }
 
-  // Color by capacity toggle
+  // Colour by capacity toggle
   if (colorByCapacityCheckbox) {
     colorByCapacityCheckbox.addEventListener('change', () => {
       if (orgTreeRoot) {
@@ -3998,132 +3934,6 @@
   }
 
   // Export organigram functionality
-  const exportOrgPng = document.getElementById('exportOrgPng');
-  const exportOrgPdf = document.getElementById('exportOrgPdf');
-
-  function getExportTitle() {
-    const mode = orgGroupBy ? orgGroupBy.value : 'overall';
-    if (mode === 'overall') return 'Organigram_Overall';
-    if (mode === 'region') {
-      const region = orgSubGroupSelect ? orgSubGroupSelect.value : '';
-      return `Organigram_${region || 'Region'}`;
-    }
-    if (mode === 'office') {
-      const office = orgSubGroupSelect ? orgSubGroupSelect.value : '';
-      return `Organigram_${office || 'Office'}`;
-    }
-    if (mode === 'person') {
-      const person = orgPersonSearch ? orgPersonSearch.value : '';
-      return `Organigram_${person || 'Person'}`;
-    }
-    return 'Organigram';
-  }
-
-  async function exportOrganigramPng() {
-    if (!orgTreeRoot) return;
-
-    const treeWrap = document.querySelector('.org-tree-wrap');
-    if (!treeWrap) return;
-
-    // Reset zoom for export
-    const oldTransform = orgTreeRoot.style.transform;
-    orgTreeRoot.style.transform = 'none';
-
-    try {
-      const canvas = await html2canvas(treeWrap, {
-        backgroundColor: '#171821',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        scrollX: 0,
-        scrollY: 0
-      });
-
-      const link = document.createElement('a');
-      link.download = `${getExportTitle()}_${new Date().toISOString().split('T')[0]}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    } catch (err) {
-      console.error('Export PNG error:', err);
-      alert('Could not export as PNG. Please try again.');
-    } finally {
-      orgTreeRoot.style.transform = oldTransform;
-    }
-  }
-
-  async function exportOrganigramPdf() {
-    if (!orgTreeRoot) return;
-
-    const treeWrap = document.querySelector('.org-tree-wrap');
-    if (!treeWrap) return;
-
-    // Reset zoom for export
-    const oldTransform = orgTreeRoot.style.transform;
-    orgTreeRoot.style.transform = 'none';
-
-    try {
-      const canvas = await html2canvas(treeWrap, {
-        backgroundColor: '#171821',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        scrollX: 0,
-        scrollY: 0
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const { jsPDF } = window.jspdf;
-
-      // Determine orientation based on content dimensions
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const orientation = imgWidth > imgHeight ? 'landscape' : 'portrait';
-
-      const pdf = new jsPDF({
-        orientation: orientation,
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-
-      // Calculate scaling to fit page
-      const maxWidth = pageWidth - (margin * 2);
-      const maxHeight = pageHeight - (margin * 2);
-      const ratio = Math.min(maxWidth / (imgWidth / 2), maxHeight / (imgHeight / 2));
-      const scaledWidth = (imgWidth / 2) * ratio;
-      const scaledHeight = (imgHeight / 2) * ratio;
-
-      // Center on page
-      const x = (pageWidth - scaledWidth) / 2;
-      const y = margin;
-
-      // Add title
-      pdf.setFontSize(14);
-      pdf.setTextColor(255, 212, 0);
-      pdf.text(getExportTitle().replace(/_/g, ' '), pageWidth / 2, margin / 2 + 3, { align: 'center' });
-
-      pdf.addImage(imgData, 'PNG', x, y + 5, scaledWidth, scaledHeight);
-
-      pdf.save(`${getExportTitle()}_${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (err) {
-      console.error('Export PDF error:', err);
-      alert('Could not export as PDF. Please try again.');
-    } finally {
-      orgTreeRoot.style.transform = oldTransform;
-    }
-  }
-
-  if (exportOrgPng) {
-    exportOrgPng.addEventListener('click', exportOrganigramPng);
-  }
-
-  if (exportOrgPdf) {
-    exportOrgPdf.addEventListener('click', exportOrganigramPdf);
-  }
-
   // Info modal
   const infoBtn = document.getElementById('infoBtn');
   const infoModal = document.getElementById('infoModal');
