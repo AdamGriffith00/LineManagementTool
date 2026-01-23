@@ -1501,6 +1501,43 @@
     orgTreesByGroup: {},
   };
 
+  // --- LocalStorage persistence -------------------------------------------
+  const STORAGE_KEY = 'lineManagementToolData';
+
+  function saveToStorage(){
+    try {
+      if (state.rawObjects && state.rawObjects.length > 0){
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.rawObjects));
+      }
+    } catch(e){
+      console.warn('Could not save to localStorage:', e);
+    }
+  }
+
+  function loadFromStorage(){
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored){
+        const objs = JSON.parse(stored);
+        if (Array.isArray(objs) && objs.length > 0){
+          processObjects(objs);
+          return true;
+        }
+      }
+    } catch(e){
+      console.warn('Could not load from localStorage:', e);
+    }
+    return false;
+  }
+
+  function clearStorage(){
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch(e){
+      console.warn('Could not clear localStorage:', e);
+    }
+  }
+
   const GRADE_ORDER = [
     'Senior Director',
     'Director',
@@ -1876,6 +1913,7 @@
           }
         }
         processObjects(objs);
+        saveToStorage();
       }catch(err){
         console.error(err);
         alert('Could not read file. Please save as CSV (UTF-8) or XLSX and try again.');
@@ -3996,6 +4034,7 @@
     state.orgTreesByGroup = {};
     fileInput.value = '';
     peopleSearch.value = '';
+    clearStorage();
     renderAll();
   });
   fileInput.addEventListener('change', e=>{
@@ -4061,6 +4100,9 @@
       if (capacityResults) capacityResults.innerHTML = '<div class="subtle">Upload a file first to search for managers.</div>';
     }
   }
+
+  // Auto-load previously saved data from localStorage
+  loadFromStorage();
 
   renderAll();
 })();
