@@ -1715,6 +1715,109 @@
     'Trainee Cost Manager'
   ];
 
+  // Nickname groups: each sub-array lists equivalent first names (all lowercase)
+  const NICKNAME_GROUPS = [
+    ['samantha','sam'],
+    ['samuel','sam'],
+    ['daniel','dan','danny'],
+    ['danielle','dani','dan'],
+    ['william','will','bill','billy'],
+    ['robert','rob','bob','bobby'],
+    ['elizabeth','liz','beth','ellie','eliza'],
+    ['michael','mike','mick','mickey'],
+    ['christopher','chris'],
+    ['matthew','matt'],
+    ['jonathan','jon','jonny'],
+    ['andrew','andy','drew'],
+    ['alexander','alex'],
+    ['nicholas','nick'],
+    ['anthony','tony'],
+    ['richard','rich','rick','ricky'],
+    ['thomas','tom','tommy'],
+    ['james','jim','jimmy'],
+    ['benjamin','ben','benny'],
+    ['timothy','tim'],
+    ['stephen','steve'],
+    ['steven','steve'],
+    ['jennifer','jen','jenny'],
+    ['katherine','kate','kathy','kath','kat'],
+    ['catherine','kate','kathy','cath','cat'],
+    ['victoria','vicky','vic'],
+    ['rebecca','bec','becky'],
+    ['margaret','maggie','meg','peggy'],
+    ['patricia','pat','trish'],
+    ['deborah','deb','debbie'],
+    ['susan','sue','susie'],
+    ['christine','chris','chrissy'],
+    ['judith','judy'],
+    ['joanna','jo'],
+    ['josephine','jo'],
+    ['joanne','jo'],
+    ['charles','charlie'],
+    ['edward','ed','ted','eddie'],
+    ['frederick','fred'],
+    ['henry','harry'],
+    ['joseph','joe'],
+    ['joshua','josh'],
+    ['lawrence','larry'],
+    ['martin','marty'],
+    ['peter','pete'],
+    ['philip','phil'],
+    ['phillip','phil'],
+    ['raymond','ray'],
+    ['alison','ali'],
+    ['amanda','mandy'],
+    ['angela','angie'],
+    ['barbara','barb'],
+    ['caroline','carol'],
+    ['charlotte','charlie'],
+    ['jacqueline','jackie'],
+    ['janet','jan'],
+    ['julia','julie'],
+    ['louise','lou'],
+    ['nicola','nic'],
+    ['rosemary','rose','rosie'],
+    ['stephanie','steph'],
+    ['suzanne','sue','suzy'],
+    ['tracey','trace'],
+  ];
+
+  // Flat lookup: first name → Set of all equivalent first names (across all groups)
+  const NICKNAME_LOOKUP = (() => {
+    const map = new Map();
+    NICKNAME_GROUPS.forEach(group => {
+      const groupSet = new Set(group);
+      group.forEach(name => {
+        if (!map.has(name)) map.set(name, new Set());
+        groupSet.forEach(v => map.get(name).add(v));
+      });
+    });
+    return map;
+  })();
+
+  function getFirstNameVariants(firstName) {
+    const key = (firstName || '').toLowerCase().trim();
+    const variants = NICKNAME_LOOKUP.get(key);
+    return variants ? Array.from(variants) : [key];
+  }
+
+  // Add nickname-variant entries to a Map or Set, skipping keys that already exist
+  function addNicknameAliases(collection, key, value) {
+    const parts = key.split(' ');
+    if (parts.length < 2) return;
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(' ');
+    getFirstNameVariants(firstName).forEach(v => {
+      if (v === firstName) return;
+      const variantKey = v + ' ' + lastName;
+      if (collection instanceof Map) {
+        if (!collection.has(variantKey)) collection.set(variantKey, value);
+      } else {
+        collection.add(variantKey);
+      }
+    });
+  }
+
   // --- Utility ------------------------------------------------------------
   function norm(s){ return (s||'').toString().trim().toLowerCase().replace(/[^a-z0-9]+/g,''); }
   function swapCommaName(name){
@@ -2170,11 +2273,16 @@
 
     const byName = new Map();
     people.forEach(p=>{ if (p.fullNameKey) byName.set(p.fullNameKey, p); });
+
+    // Nickname-augmented lookup: also resolves short names (e.g. "Sam" → "Samantha")
+    const nicknameByKey = new Map(byName);
+    people.forEach(p=>{ if (p.fullNameKey) addNicknameAliases(nicknameByKey, p.fullNameKey, p); });
+
     people.forEach(p=>{ p.currentReports = 0; });
     people.forEach(p=>{
       const mgr = p.managerKey;
       if (!mgr) return;
-      const m = byName.get(mgr);
+      const m = nicknameByKey.get(mgr);
       if (m) m.currentReports++;
     });
 
@@ -2198,6 +2306,7 @@
     state.rawObjects = objs;
     state.people = people;
     state.managersByName = byName;
+    state.nicknameByKey = nicknameByKey;
 
     // Show change log if there was previous data
     if (oldPeople.length > 0) {
@@ -2254,11 +2363,14 @@
   function detectDataIssues(people) {
     const issues = [];
 
-    // Build set of all person keys
+    // Build set of all person keys (including nickname variants) for orphan detection
     const allKeys = new Set();
     people.forEach(p => {
       const key = canonicalName(p.FullName || p.Name);
-      if (key) allKeys.add(key);
+      if (key) {
+        allKeys.add(key);
+        addNicknameAliases(allKeys, key, null);
+      }
     });
 
     // Detect orphans (manager not in system)
@@ -2356,11 +2468,14 @@
       return;
     }
 
-    // Build set of all person keys for orphan detection
+    // Build set of all person keys (including nickname variants) for orphan detection
     const allKeys = new Set();
     people.forEach(p => {
       const key = canonicalName(p.FullName || p.Name);
-      if (key) allKeys.add(key);
+      if (key) {
+        allKeys.add(key);
+        addNicknameAliases(allKeys, key, null);
+      }
     });
 
     peopleBody.innerHTML = filtered.map(p=>{
@@ -3027,8 +3142,17 @@
     return count;
   }
 
+  // Normalise QS titles to their CM equivalents for GRADE_ORDER lookups
+  // so Senior QS and Senior Cost Manager sort at the same level
+  function normalizeGradeForOrder(grade) {
+    return (grade || '')
+      .replace(/\bQuantity Surveyor\b/gi, 'Cost Manager')
+      .replace(/\bQS\b/g, 'Cost Manager');
+  }
+
   function gradeIndex(grade) {
-    const idx = GRADE_ORDER.indexOf((grade || '').trim());
+    const normalised = normalizeGradeForOrder((grade || '').trim());
+    const idx = GRADE_ORDER.indexOf(normalised);
     return idx === -1 ? GRADE_ORDER.length : idx;
   }
 
@@ -3260,6 +3384,8 @@
 
     const byKey = new Map();
     nodes.forEach(n => { if (n.key) byKey.set(n.key, n); });
+    // Add nickname aliases so managers referenced by short name connect correctly
+    nodes.forEach(n => { if (n.key) addNicknameAliases(byKey, n.key, n); });
 
     nodes.forEach(node => {
       const mgr = node.managerKey && byKey.get(node.managerKey);
