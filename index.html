@@ -1840,9 +1840,8 @@
   function gradeForCapacity(value){
     const clean = tidyLabel(value);
     const lower = clean.toLowerCase();
-    // Treat bare Cost Manager / Quantity Surveyor roles as Professional for
-    // capacity defaults while leaving the displayed grade untouched.
-    if (lower === 'cost manager' || lower === 'quantity surveyor'){
+    // Treat bare professional-level titles as Professional for capacity defaults
+    if (lower === 'cost manager' || lower === 'quantity surveyor' || lower === 'project manager'){
       return 'Professional';
     }
     return clean;
@@ -1864,8 +1863,8 @@
     if (lower.includes('assistant')) return 'Assistant';
     if (lower.includes('graduate')) return 'Graduate';
     if (lower.includes('trainee')) return 'Trainee';
-    // Bare "Cost Manager" or "Quantity Surveyor" = Professional
-    if (lower === 'cost manager' || lower === 'quantity surveyor') return 'Professional';
+    // Bare professional-level titles = Professional
+    if (lower === 'cost manager' || lower === 'quantity surveyor' || lower === 'project manager') return 'Professional';
     // Fallback to original
     return clean;
   }
@@ -2837,6 +2836,11 @@
       if (targetPerson && targetGradeIdx !== null) {
         const candidateGradeIdx = getGradeIndex(p.Grade);
         if (candidateGradeIdx > targetGradeIdx) return false; // Lower seniority = higher index
+        // Discipline filter: CM/QS targets only see CM/QS managers; PM targets only see PM managers.
+        // Director-level managers (Associate Director and above) are shared across all disciplines.
+        const targetDisc = getDiscipline(targetPerson.Grade);
+        const candidateDisc = getDiscipline(p.Grade);
+        if (targetDisc !== 'Director' && candidateDisc !== 'Director' && targetDisc !== candidateDisc) return false;
       }
       return true;
     }).sort((a,b)=>{
@@ -3142,12 +3146,22 @@
     return count;
   }
 
-  // Normalise QS titles to their CM equivalents for GRADE_ORDER lookups
-  // so Senior QS and Senior Cost Manager sort at the same level
+  // Normalise QS and PM titles to their CM equivalents for GRADE_ORDER lookups
+  // so e.g. Senior QS and Senior Project Manager sort at the same level as Senior Cost Manager
   function normalizeGradeForOrder(grade) {
     return (grade || '')
       .replace(/\bQuantity Surveyor\b/gi, 'Cost Manager')
-      .replace(/\bQS\b/g, 'Cost Manager');
+      .replace(/\bQS\b/g, 'Cost Manager')
+      .replace(/\bProject Manager\b/gi, 'Cost Manager')
+      .replace(/\bPM\b/g, 'Cost Manager');
+  }
+
+  // Return the discipline for a grade: 'Director' (shared), 'CM' (cost management / QS), or 'PM'
+  function getDiscipline(grade) {
+    const lower = (grade || '').toLowerCase();
+    if (lower.includes('director')) return 'Director';
+    if (lower.includes('project manager') || /\bpm\b/.test(lower)) return 'PM';
+    return 'CM'; // Cost Manager, QS, or unrecognised defaults to CM
   }
 
   function gradeIndex(grade) {
@@ -3172,19 +3186,19 @@
       { depth: 3, labels: ['associate director'] },
       { depth: 1, labels: [' director '] }, // plain "Director"
 
-      // Exec CM / QS
-      { depth: 4, labels: ['executive cost manager', 'executive quantity surveyor'] },
+      // Exec CM / QS / PM
+      { depth: 4, labels: ['executive cost manager', 'executive quantity surveyor', 'executive project manager'] },
 
-      // Senior CM / QS
-      { depth: 5, labels: ['senior cost manager', 'senior quantity surveyor'] },
+      // Senior CM / QS / PM
+      { depth: 5, labels: ['senior cost manager', 'senior quantity surveyor', 'senior project manager'] },
 
-      // Assistant / Graduate / Trainee CM / QS – specific before generic
-      { depth: 7, labels: ['assistant cost manager', 'assistant quantity surveyor'] },
-      { depth: 8, labels: ['graduate cost manager', 'graduate quantity surveyor'] },
-      { depth: 9, labels: ['trainee cost manager', 'trainee quantity surveyor'] },
+      // Assistant / Graduate / Trainee CM / QS / PM – specific before generic
+      { depth: 7, labels: ['assistant cost manager', 'assistant quantity surveyor', 'assistant project manager'] },
+      { depth: 8, labels: ['graduate cost manager', 'graduate quantity surveyor', 'graduate project manager'] },
+      { depth: 9, labels: ['trainee cost manager', 'trainee quantity surveyor', 'trainee project manager'] },
 
-      // Generic Cost Manager / QS (checked last so it doesn't swallow the others)
-      { depth: 6, labels: [' cost manager ', ' quantity surveyor '] },
+      // Generic Cost Manager / QS / PM (checked last so it doesn't swallow the others)
+      { depth: 6, labels: [' cost manager ', ' quantity surveyor ', ' project manager '] },
     ];
 
     for (let i = 0; i < rules.length; i++) {
